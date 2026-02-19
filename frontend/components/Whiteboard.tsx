@@ -250,6 +250,25 @@ const Whiteboard = () => {
                 return;
             }
 
+            // Text only Color shortcuts (7-0)
+            if (['7', '8', '9', '0'].includes(e.key) && s.selectedIds.size > 0) {
+                const textColorMap: Record<string, string> = {
+                    '7': 'black',
+                    '8': '#ef4444', // Red
+                    '9': '#155dfc', // Blue
+                    '0': '#22c55e', // Green
+                };
+
+                const color = textColorMap[e.key];
+                if (color) {
+                    saveHistory();
+                    setTexts(prev => prev.map(t => s.selectedIds.has(t.id) ? { ...t, fill: color } : t));
+                    setRects(prev => prev.map(r => s.selectedIds.has(r.id) ? { ...r, textFill: color } : r));
+                    setCircles(prev => prev.map(c => s.selectedIds.has(c.id) ? { ...c, textFill: color } : c));
+                }
+                return;
+            }
+
             // Edit mode (E key)
             if ((e.key === 'e' || e.key === 'E') && s.selectedIds.size === 1) {
                 const id = Array.from(s.selectedIds)[0];

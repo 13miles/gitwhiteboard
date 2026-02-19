@@ -33,7 +33,7 @@ const ShortcutHelp = () => {
                         <li><kbd className="font-mono bg-gray-100 px-1 rounded border">D</kbd> / <kbd className="font-mono bg-gray-100 px-1 rounded border">Delete</kbd> 선택 삭제</li>
                         <li><kbd className="font-mono bg-gray-100 px-1 rounded border">A</kbd> 좌측 정렬 &nbsp;<kbd className="font-mono bg-gray-100 px-1 rounded border">Q</kbd> 수직 균등 배분</li>
                         <li><kbd className="font-mono bg-gray-100 px-1 rounded border">S</kbd> 위쪽 정렬 &nbsp;<kbd className="font-mono bg-gray-100 px-1 rounded border">W</kbd> 수평 균등 배분</li>
-                        <li><kbd className="font-mono bg-gray-100 px-1 rounded border">1</kbd>~<kbd className="font-mono bg-gray-100 px-1 rounded border">6</kbd> 색상 변경</li>
+                        <li><kbd className="font-mono bg-gray-100 px-1 rounded border">0</kbd>~<kbd className="font-mono bg-gray-100 px-1 rounded border">9</kbd> 색상 변경</li>
                         <li><kbd className="font-mono bg-gray-100 px-1 rounded border">Ctrl+C/V</kbd> 복사·붙여넣기</li>
                         <li><kbd className="font-mono bg-gray-100 px-1 rounded border">Ctrl+Z</kbd> 실행 취소</li>
                     </ul>

@@ -13,7 +13,8 @@
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "react-konva": "^19.2.2"
+    "react-konva": "^19.2.2",
+    "use-image": "^1.1.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

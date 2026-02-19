@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Stage, Layer, Circle, Group, Text, Rect, Line, Arrow } from 'react-konva';
+import { Stage, Layer, Circle, Group, Text, Rect, Line, Arrow, Image as KonvaImage, Transformer } from 'react-konva';
 import Konva from 'konva';
+import useImage from 'use-image';
 
 interface CircleData {
     id: string;
@@ -21,6 +22,15 @@ interface RectData {
     height: number;
     text?: string;
     stroke?: string;
+}
+
+interface ImageData {
+    id: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    src: string;
 }
 
 interface LineData {
@@ -42,23 +52,107 @@ interface TextData {
     fill: string;
 }
 
+const URLImage = ({ image }: { image: ImageData }) => {
+    const [img] = useImage(image.src);
+    return (
+        <KonvaImage
+            image={img}
+            x={0}
+            y={0}
+            width={image.width}
+            height={image.height}
+        />
+    );
+};
+
+
 const Whiteboard = () => {
     const [circles, setCircles] = useState<CircleData[]>([]);
     const [lines, setLines] = useState<LineData[]>([]);
     const [rects, setRects] = useState<RectData[]>([]);
     const [texts, setTexts] = useState<TextData[]>([]);
+    const [images, setImages] = useState<ImageData[]>([]);
 
-    const [history, setHistory] = useState<{ circles: CircleData[], lines: LineData[], rects: RectData[], texts: TextData[] }[]>([]);
+    // Transformer Ref
+    const trRef = useRef<Konva.Transformer>(null);
+
+    const [history, setHistory] = useState<{ circles: CircleData[], lines: LineData[], rects: RectData[], texts: TextData[], images: ImageData[] }[]>([]);
 
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+    // Selection Transformer Effect
+    useEffect(() => {
+        if (trRef.current) {
+            const nodes: Konva.Node[] = [];
+            selectedIds.forEach(id => {
+                const node = shapeRefs.current[id];
+                if (node) nodes.push(node);
+            });
+            trRef.current.nodes(nodes);
+            trRef.current.getLayer()?.batchDraw();
+        }
+    }, [selectedIds, circles, lines, rects, texts, images]);
+
+    // Handle Transform End
+    const handleTransformEnd = () => {
+        saveHistory();
+        const nodes = trRef.current?.nodes();
+        if (!nodes) return;
+
+        nodes.forEach(node => {
+            const id = Object.keys(shapeRefs.current).find(key => shapeRefs.current[key] === node);
+            if (!id) return;
+
+            const scaleX = node.scaleX();
+            const scaleY = node.scaleY();
+
+            // Reset scale to 1 and update width/height for better handling
+            node.scaleX(1);
+            node.scaleY(1);
+
+            if (id.startsWith('rect')) {
+                setRects(prev => prev.map(r => r.id === id ? {
+                    ...r,
+                    x: node.x(),
+                    y: node.y(),
+                    width: Math.max(5, node.width() * scaleX),
+                    height: Math.max(5, node.height() * scaleY),
+                } : r));
+            } else if (id.startsWith('circle')) {
+                setCircles(prev => prev.map(c => c.id === id ? {
+                    ...c,
+                    x: node.x(),
+                    y: node.y(),
+                    radius: Math.max(5, c.radius * Math.max(scaleX, scaleY))
+                } : c));
+            } else if (id.startsWith('text')) {
+                setTexts(prev => prev.map(t => t.id === id ? {
+                    ...t,
+                    x: node.x(),
+                    y: node.y(),
+                    fontSize: Math.max(12, t.fontSize * scaleY)
+                } : t));
+            } else if (id.startsWith('image')) {
+                setImages(prev => prev.map(i => i.id === id ? {
+                    ...i,
+                    x: node.x(),
+                    y: node.y(),
+                    width: Math.max(5, i.width * scaleX),
+                    height: Math.max(5, i.height * scaleY),
+                } : i));
+            }
+        });
+    };
 
     const [mode, setMode] = useState<'select' | 'line' | 'arrow' | 'text'>('select');
 
     const [tempLineStartId, setTempLineStartId] = useState<string | null>(null);
 
     const [isPanning, setIsPanning] = useState(false);
+    const [isLoaded, setIsLoaded] = useState(false);
 
     const [lastRPressTime, setLastRPressTime] = useState(0);
+    const [lastCPressTime, setLastCPressTime] = useState(0);
 
     // Clipboard
     const [clipboard, setClipboard] = useState<{ circles: CircleData[], lines: LineData[], rects: RectData[], texts: TextData[] } | null>(null);
@@ -84,6 +178,70 @@ const Whiteboard = () => {
     const stageRef = useRef<Konva.Stage>(null);
     const [size, setSize] = useState({ width: 0, height: 0 });
     const shapeRefs = useRef<{ [key: string]: Konva.Node | null }>({});
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Paste Handler
+    useEffect(() => {
+        const handlePaste = (e: ClipboardEvent) => {
+            const items = e.clipboardData?.items;
+            if (!items) return;
+
+            for (const item of items) {
+                if (item.type.indexOf('image') !== -1) {
+                    const blob = item.getAsFile();
+                    if (blob) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                            const src = event.target?.result as string;
+                            const img = new Image();
+                            img.src = src;
+                            img.onload = () => {
+                                saveHistory();
+                                const newImage: ImageData = {
+                                    id: `image-${Date.now()}`,
+                                    x: 100,
+                                    y: 100,
+                                    width: img.width / 2, // Initial scale down
+                                    height: img.height / 2,
+                                    src
+                                };
+                                setImages(prev => [...prev, newImage]);
+                            };
+                        };
+                        reader.readAsDataURL(blob);
+                    }
+                }
+            }
+        };
+
+        window.addEventListener('paste', handlePaste);
+        return () => window.removeEventListener('paste', handlePaste);
+    }, [images]); // Depend on images for state update consistency if needed, though setState callback handles it.
+
+    // Load from localStorage on mount
+    useEffect(() => {
+        const savedData = localStorage.getItem('whiteboard-data');
+        if (savedData) {
+            try {
+                const parsed = JSON.parse(savedData);
+                if (parsed.circles) setCircles(parsed.circles);
+                if (parsed.lines) setLines(parsed.lines);
+                if (parsed.rects) setRects(parsed.rects);
+                if (parsed.texts) setTexts(parsed.texts);
+                if (parsed.images) setImages(parsed.images);
+            } catch (e) {
+                console.error("Failed to load data", e);
+            }
+        }
+        setIsLoaded(true);
+    }, []);
+
+    // Save to localStorage on change
+    useEffect(() => {
+        if (!isLoaded) return;
+        const data = { circles, lines, rects, texts, images };
+        localStorage.setItem('whiteboard-data', JSON.stringify(data));
+    }, [circles, lines, rects, texts, images, isLoaded]);
 
     useEffect(() => {
         setSize({ width: window.innerWidth, height: window.innerHeight });
@@ -94,6 +252,60 @@ const Whiteboard = () => {
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
+
+    const handleSave = () => {
+        const data = { circles, lines, rects, texts, images };
+        const jsonString = JSON.stringify(data, null, 2);
+        const blob = new Blob([jsonString], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `whiteboard-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handleLoad = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const json = event.target?.result as string;
+                const parsed = JSON.parse(json);
+                // Basic validation
+                if (parsed && typeof parsed === 'object') {
+                    saveHistory(); // Save current state before loading
+                    setCircles(parsed.circles || []);
+                    setLines(parsed.lines || []);
+                    setRects(parsed.rects || []);
+                    setTexts(parsed.texts || []);
+                    setImages(parsed.images || []);
+                    // Clear selection and mode
+                    setSelectedIds(new Set());
+                    setMode('select');
+                }
+            } catch (err) {
+                alert("Failed to load file: Invalid JSON");
+            }
+        };
+        reader.readAsText(file);
+        // Reset input value so same file can be selected again
+        e.target.value = '';
+    };
+
+    const handleClear = () => {
+        saveHistory();
+        setCircles([]);
+        setLines([]);
+        setRects([]);
+        setTexts([]);
+        setImages([]);
+        setSelectedIds(new Set());
+        localStorage.removeItem('whiteboard-data');
+    };
 
     useEffect(() => {
         if (editingId && textareaRef.current) {
@@ -239,13 +451,14 @@ const Whiteboard = () => {
                 return;
             }
 
-            if (['1', '2', '3', '4', '5'].includes(e.key) && selectedIds.size > 0) {
+            if (['1', '2', '3', '4', '5', '6'].includes(e.key) && selectedIds.size > 0) {
                 const colorMap: { [key: string]: string } = {
                     '1': 'black',
                     '2': 'red',
-                    '3': 'green',
-                    '4': 'gray',
-                    '5': 'white'
+                    '3': '#1d4ed8',
+                    '4': '#15803d',
+                    '5': 'gray',
+                    '6': 'white'
                 };
                 const newColor = colorMap[e.key];
 
@@ -280,39 +493,36 @@ const Whiteboard = () => {
 
             if (mode === 'select') {
                 if (e.key === 'c' || e.key === 'C') {
-                    if (selectedIds.size === 1) {
-                        const selectedId = Array.from(selectedIds)[0];
-                        const selectedRect = rects.find(r => r.id === selectedId);
+                    const now = Date.now();
+                    const isDoubleTap = now - lastCPressTime < 400;
+                    setLastCPressTime(now);
 
-                        if (selectedRect) {
-                            const node = shapeRefs.current[selectedId];
-                            if (node) {
-                                saveHistory();
-                                const absPos = node.getAbsolutePosition();
-                                setEditPos({
-                                    x: absPos.x,
-                                    y: absPos.y,
-                                    w: selectedRect.width,
-                                    h: selectedRect.height
-                                });
-                                setEditingId(selectedId);
-                            }
-                            return;
-                        }
+                    // Creation Mode
+                    if (isDoubleTap) {
+                        setCircles(prev => {
+                            if (prev.length === 0) return prev;
+                            const lastCircle = prev[prev.length - 1];
+                            const newCircles = [...prev];
+                            newCircles[newCircles.length - 1] = {
+                                ...lastCircle,
+                                text: '' // Clear text on double tap
+                            };
+                            return newCircles;
+                        });
+                    } else {
+                        saveHistory();
+                        const { x, y } = getRelativePointerPosition();
+
+                        const newCircle: CircleData = {
+                            id: `circle-${Date.now()}`,
+                            x: x || 100,
+                            y: y || 100,
+                            radius: 37.5,
+                            text: getRandomHex2(),
+                            stroke: 'black'
+                        };
+                        setCircles((prev) => [...prev, newCircle]);
                     }
-
-                    saveHistory();
-                    const { x, y } = getRelativePointerPosition();
-
-                    const newCircle: CircleData = {
-                        id: `circle-${Date.now()}`,
-                        x: x || 100,
-                        y: y || 100,
-                        radius: 37.5,
-                        text: getRandomHex2(),
-                        stroke: 'black'
-                    };
-                    setCircles((prev) => [...prev, newCircle]);
                 }
 
                 if (e.key === 'r' || e.key === 'R') {
@@ -325,10 +535,18 @@ const Whiteboard = () => {
                             if (prev.length === 0) return prev;
                             const lastRect = prev[prev.length - 1];
                             const newRects = [...prev];
-                            newRects[newRects.length - 1] = {
-                                ...lastRect,
-                                width: 150,
-                            };
+
+                            if (lastRect.width === 75 && lastRect.height === 75) {
+                                newRects[newRects.length - 1] = {
+                                    ...lastRect,
+                                    width: 150,
+                                };
+                            } else if (lastRect.width === 150 && lastRect.height === 75) {
+                                newRects[newRects.length - 1] = {
+                                    ...lastRect,
+                                    height: 150
+                                };
+                            }
                             return newRects;
                         });
                     } else {
@@ -357,6 +575,7 @@ const Whiteboard = () => {
                         setLines((prev) => prev.filter((l) => !selectedIds.has(l.id)));
                         setRects((prev) => prev.filter((r) => !selectedIds.has(r.id)));
                         setTexts((prev) => prev.filter((t) => !selectedIds.has(t.id)));
+                        setImages((prev) => prev.filter((i) => !selectedIds.has(i.id)));
                         setSelectedIds(new Set());
                     }
                 }
@@ -368,6 +587,7 @@ const Whiteboard = () => {
                         lines.forEach(l => { if (selectedIds.has(l.id) && l.x < minX) minX = l.x; });
                         rects.forEach(r => { if (selectedIds.has(r.id) && r.x < minX) minX = r.x; });
                         texts.forEach(t => { if (selectedIds.has(t.id) && t.x < minX) minX = t.x; });
+                        images.forEach(i => { if (selectedIds.has(i.id) && i.x < minX) minX = i.x; });
 
                         if (minX !== Infinity) {
                             saveHistory();
@@ -375,34 +595,7 @@ const Whiteboard = () => {
                             setLines(prev => prev.map(l => selectedIds.has(l.id) ? { ...l, x: minX } : l));
                             setRects(prev => prev.map(r => selectedIds.has(r.id) ? { ...r, x: minX } : r));
                             setTexts(prev => prev.map(t => selectedIds.has(t.id) ? { ...t, x: minX } : t));
-                        }
-                    }
-                }
-
-                if (e.key === 'e' || e.key === 'E') {
-                    if (selectedIds.size === 1) {
-                        const selectedId = Array.from(selectedIds)[0];
-                        // Check if it's a TextData
-                        const selectedText = texts.find(t => t.id === selectedId);
-
-                        if (selectedText) {
-                            const node = shapeRefs.current[selectedId];
-                            if (node) {
-                                saveHistory();
-                                const absPos = node.getAbsolutePosition();
-                                // For Text object, width/height might need to be retrieved or approximated
-                                // node.width() * node.scaleX()
-                                const width = node.width() * node.scaleX();
-                                const height = node.height() * node.scaleY();
-
-                                setEditPos({
-                                    x: absPos.x,
-                                    y: absPos.y,
-                                    w: Math.max(width, 200), // Ensure min width for editing
-                                    h: Math.max(height, 30)
-                                });
-                                setEditingId(selectedId);
-                            }
+                            setImages(prev => prev.map(i => selectedIds.has(i.id) ? { ...i, x: minX } : i));
                         }
                     }
                 }
@@ -624,6 +817,17 @@ const Whiteboard = () => {
             }
         });
 
+        images.forEach((i) => {
+            if (
+                selBox.x1 < i.x + i.width &&
+                selBox.x2 > i.x &&
+                selBox.y1 < i.y + i.height &&
+                selBox.y2 > i.y
+            ) {
+                newSelected.add(i.id);
+            }
+        });
+
         setSelectedIds(newSelected);
         setSelection(null);
     };
@@ -636,21 +840,20 @@ const Whiteboard = () => {
             setSelectedIds(new Set([id]));
         }
 
-        selectedIds.forEach(selectedId => {
+        // Store initial positions for all selected items
+        const newSelectedIds = selectedIds.has(id) ? selectedIds : new Set([id]);
+
+        newSelectedIds.forEach(selectedId => {
             const node = shapeRefs.current[selectedId];
             if (node) {
                 node.setAttr('startPos', { x: node.x(), y: node.y() });
             }
         });
-        if (!selectedIds.has(id)) {
-            const node = shapeRefs.current[id];
-            if (node) node.setAttr('startPos', { x: node.x(), y: node.y() });
-        }
     };
 
     const handleDragMove = (id: string, e: any) => {
         if (mode !== 'select' || isPanning || editingId) return;
-        if (!selectedIds.has(id)) return;
+        // If dragging an item that is not selected, select it (handled in dragStart, but safety check)
 
         const draggedNode = e.target;
         const startPos = draggedNode.getAttr('startPos');
@@ -674,33 +877,43 @@ const Whiteboard = () => {
     const handleDragEnd = (id: string, e: any) => {
         if (mode !== 'select' || isPanning || editingId) return;
 
+        // Synchronize state with Konva nodes
+        const newSelectedIds = selectedIds.has(id) ? selectedIds : new Set([id]);
+
         setCircles(prev => prev.map(c => {
-            if (selectedIds.has(c.id) || c.id === id) {
+            if (newSelectedIds.has(c.id)) {
                 const node = shapeRefs.current[c.id];
-                if (node) return { ...c, x: node.x(), y: node.y() };
+                return node ? { ...c, x: node.x(), y: node.y() } : c;
             }
             return c;
         }));
+        setLines(prev => prev.map(l => {
+            if (newSelectedIds.has(l.id)) {
+                const node = shapeRefs.current[l.id];
+                return node ? { ...l, x: node.x(), y: node.y() } : l;
+            }
+            return l;
+        }));
         setRects(prev => prev.map(r => {
-            if (selectedIds.has(r.id) || r.id === id) {
+            if (newSelectedIds.has(r.id)) {
                 const node = shapeRefs.current[r.id];
-                if (node) return { ...r, x: node.x(), y: node.y() };
+                return node ? { ...r, x: node.x(), y: node.y() } : r;
             }
             return r;
         }));
         setTexts(prev => prev.map(t => {
-            if (selectedIds.has(t.id) || t.id === id) {
+            if (newSelectedIds.has(t.id)) {
                 const node = shapeRefs.current[t.id];
-                if (node) return { ...t, x: node.x(), y: node.y() };
+                return node ? { ...t, x: node.x(), y: node.y() } : t;
             }
             return t;
         }));
-        setLines(prev => prev.map(l => {
-            if (selectedIds.has(l.id) || l.id === id) {
-                const node = shapeRefs.current[l.id];
-                if (node) return { ...l, x: node.x(), y: node.y() };
+        setImages(prev => prev.map(i => {
+            if (newSelectedIds.has(i.id)) {
+                const node = shapeRefs.current[i.id];
+                return node ? { ...i, x: node.x(), y: node.y() } : i;
             }
-            return l;
+            return i;
         }));
     };
 
@@ -804,12 +1017,17 @@ const Whiteboard = () => {
         modeHint = 'Click anywhere to type';
     }
 
-    const currentEditingRect = editingId ? rects.find(r => r.id === editingId) : null;
-    const currentEditingText = editingId ? texts.find(t => t.id === editingId) : null;
+    const currentEditingRect = rects.find(r => r.id === editingId);
+    const currentEditingText = texts.find(t => t.id === editingId);
+    const currentEditingCircle = circles.find(c => c.id === editingId);
 
-    // Combine edit handling
     const isEditingRect = !!currentEditingRect;
-    const editingValue = isEditingRect ? currentEditingRect?.text : currentEditingText?.text;
+    const isEditingCircle = !!currentEditingCircle;
+
+    // Determine initial value based on what we are editing
+    const editingValue = isEditingRect ? currentEditingRect.text
+        : isEditingCircle ? currentEditingCircle.text
+            : currentEditingText?.text;
 
     return (
         <>
@@ -822,8 +1040,37 @@ const Whiteboard = () => {
                 </div>
             </div>
 
+            {/* Session Management UI */}
+            <div className="absolute top-4 left-4 flex gap-2 z-10">
+                <button
+                    onClick={handleSave}
+                    className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded shadow text-sm font-medium"
+                >
+                    Save
+                </button>
+                <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded shadow text-sm font-medium"
+                >
+                    Load
+                </button>
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleLoad}
+                    accept=".json"
+                    className="hidden"
+                />
+                <button
+                    onClick={handleClear}
+                    className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded shadow text-sm font-medium"
+                >
+                    Clear
+                </button>
+            </div>
+
             {/* Inline Text Area */}
-            {editingId && editPos && (currentEditingRect || currentEditingText) && (
+            {editingId && editPos && (currentEditingRect || currentEditingText || currentEditingCircle) && (
                 <textarea
                     ref={textareaRef}
                     value={editingValue || ""}
@@ -831,6 +1078,8 @@ const Whiteboard = () => {
                         const val = e.target.value;
                         if (isEditingRect) {
                             setRects(prev => prev.map(r => r.id === editingId ? { ...r, text: val } : r));
+                        } else if (isEditingCircle) {
+                            setCircles(prev => prev.map(c => c.id === editingId ? { ...c, text: val } : c));
                         } else {
                             setTexts(prev => prev.map(t => t.id === editingId ? { ...t, text: val } : t));
                         }
@@ -850,11 +1099,11 @@ const Whiteboard = () => {
                         position: 'absolute',
                         left: editPos.x,
                         top: editPos.y,
-                        width: isEditingRect ? editPos.w : 'auto',
-                        height: isEditingRect ? editPos.h : 'auto',
-                        minWidth: isEditingRect ? undefined : '200px', // Min width for text tool
-                        fontSize: isEditingRect ? 18 : (currentEditingText?.fontSize || 20),
-                        textAlign: isEditingRect ? 'center' : 'left',
+                        width: (isEditingRect || isEditingCircle) ? editPos.w : 'auto',
+                        height: (isEditingRect || isEditingCircle) ? editPos.h : 'auto',
+                        minWidth: (isEditingRect || isEditingCircle) ? undefined : '200px', // Min width for text tool
+                        fontSize: (isEditingRect || isEditingCircle) ? 18 : (currentEditingText?.fontSize || 20),
+                        textAlign: (isEditingRect || isEditingCircle) ? 'center' : 'left',
                         border: '1px solid #3b82f6',
                         outline: 'none',
                         background: 'transparent',
@@ -862,10 +1111,10 @@ const Whiteboard = () => {
                         overflow: 'hidden',
                         zIndex: 20,
                         padding: 0,
-                        paddingTop: isEditingRect ? Math.max(0, (editPos.h - (editingValue?.split('\n').length || 1) * 22) / 2) : 0,
+                        paddingTop: (isEditingRect || isEditingCircle) ? Math.max(0, (editPos.h - (editingValue?.split('\n').length || 1) * 22) / 2) : 0,
                         lineHeight: '22px',
-                        fontFamily: 'Arial, sans-serif',
-                        color: isEditingRect ? 'black' : (currentEditingText?.fill || 'black')
+                        fontFamily: 'Consolas, monospace',
+                        color: (isEditingRect || isEditingCircle) ? 'black' : (currentEditingText?.fill || 'black')
                     }}
                 />
             )}
@@ -905,6 +1154,7 @@ const Whiteboard = () => {
                                 onDragStart={(e) => handleDragStart(rect.id, e)}
                                 onDragMove={(e) => handleDragMove(rect.id, e)}
                                 onDragEnd={(e) => handleDragEnd(rect.id, e)}
+                                onTransformEnd={handleTransformEnd}
                             >
                                 <Rect
                                     width={rect.width}
@@ -922,7 +1172,7 @@ const Whiteboard = () => {
                                         align="center"
                                         verticalAlign="middle"
                                         listening={false}
-                                        lineHeight={1.2}
+                                        fontFamily="Consolas, monospace"
                                     />
                                 )}
                             </Group>
@@ -950,6 +1200,7 @@ const Whiteboard = () => {
                                 onDragStart={(e) => handleDragStart(textItem.id, e)}
                                 onDragMove={(e) => handleDragMove(textItem.id, e)}
                                 onDragEnd={(e) => handleDragEnd(textItem.id, e)}
+                                onTransformEnd={handleTransformEnd}
                             >
                                 {!isEditing && (
                                     <>
@@ -968,7 +1219,7 @@ const Whiteboard = () => {
                                             fontSize={textItem.fontSize}
                                             fill={textItem.fill}
                                             align="left"
-                                            lineHeight={1.2}
+                                            fontFamily="Consolas, monospace"
                                         />
                                     </>
                                 )}
@@ -1045,6 +1296,7 @@ const Whiteboard = () => {
                                 onDragStart={(e) => handleDragStart(circle.id, e)}
                                 onDragMove={(e) => handleDragMove(circle.id, e)}
                                 onDragEnd={(e) => handleDragEnd(circle.id, e)}
+                                onTransformEnd={handleTransformEnd}
                             >
                                 <Circle
                                     radius={circle.radius}
@@ -1063,10 +1315,47 @@ const Whiteboard = () => {
                                     width={30}
                                     height={21}
                                     listening={false}
+                                    fontFamily="Consolas, monospace"
                                 />
                             </Group>
                         );
                     })}
+
+                    {images.map((image) => {
+                        const isSelected = selectedIds.has(image.id);
+                        return (
+                            <Group
+                                key={image.id}
+                                x={image.x}
+                                y={image.y}
+                                ref={(node) => {
+                                    if (node) shapeRefs.current[image.id] = node;
+                                    else delete shapeRefs.current[image.id];
+                                }}
+                                draggable={mode === 'select' && !isPanning}
+                                onClick={(e) => {
+                                    if (!isPanning) handleClick(image.id, e)
+                                }}
+                                onDragStart={(e) => handleDragStart(image.id, e)}
+                                onDragMove={(e) => handleDragMove(image.id, e)}
+                                onDragEnd={(e) => handleDragEnd(image.id, e)}
+                                onTransformEnd={handleTransformEnd}
+                            >
+                                <URLImage image={image} />
+                            </Group>
+                        );
+                    })}
+
+                    <Transformer
+                        ref={trRef}
+                        boundBoxFunc={(oldBox, newBox) => {
+                            // limit resize
+                            if (newBox.width < 5 || newBox.height < 5) {
+                                return oldBox;
+                            }
+                            return newBox;
+                        }}
+                    />
 
                     {selection && selection.isSelecting && !isPanning && (
                         <Rect

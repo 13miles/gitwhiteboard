@@ -60,6 +60,9 @@ const Whiteboard = () => {
 
     const [lastRPressTime, setLastRPressTime] = useState(0);
 
+    // Clipboard
+    const [clipboard, setClipboard] = useState<{ circles: CircleData[], lines: LineData[], rects: RectData[], texts: TextData[] } | null>(null);
+
     // Text Editing
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editPos, setEditPos] = useState<{ x: number, y: number, w: number, h: number } | null>(null);
@@ -172,8 +175,67 @@ const Whiteboard = () => {
 
             const metaPressed = e.shiftKey || e.ctrlKey || e.metaKey;
 
+            // Undo
             if ((e.key === 'z' || e.key === 'Z') && (e.ctrlKey || e.metaKey)) {
                 undo();
+                return;
+            }
+
+            // Copy (Ctrl+C)
+            if ((e.key === 'c' || e.key === 'C') && (e.ctrlKey || e.metaKey)) {
+                if (selectedIds.size > 0) {
+                    const selectedCircles = circles.filter(c => selectedIds.has(c.id));
+                    const selectedLines = lines.filter(l => selectedIds.has(l.id));
+                    const selectedRects = rects.filter(r => selectedIds.has(r.id));
+                    const selectedTexts = texts.filter(t => selectedIds.has(t.id));
+
+                    setClipboard({
+                        circles: structuredClone(selectedCircles),
+                        lines: structuredClone(selectedLines),
+                        rects: structuredClone(selectedRects),
+                        texts: structuredClone(selectedTexts)
+                    });
+                }
+                return;
+            }
+
+            // Paste (Ctrl+V)
+            if ((e.key === 'v' || e.key === 'V') && (e.ctrlKey || e.metaKey)) {
+                if (clipboard) {
+                    saveHistory();
+                    const offset = 20;
+                    const newIds = new Set<string>();
+
+                    const newCircles = clipboard.circles.map(c => {
+                        const newId = `circle-${Date.now()}-${Math.random()}`;
+                        newIds.add(newId);
+                        return { ...c, id: newId, x: c.x + offset, y: c.y + offset };
+                    });
+
+                    const newLines = clipboard.lines.map(l => {
+                        const newId = `line-${Date.now()}-${Math.random()}`;
+                        newIds.add(newId);
+                        return { ...l, id: newId, x: l.x + offset, y: l.y + offset };
+                    });
+
+                    const newRects = clipboard.rects.map(r => {
+                        const newId = `rect-${Date.now()}-${Math.random()}`;
+                        newIds.add(newId);
+                        return { ...r, id: newId, x: r.x + offset, y: r.y + offset };
+                    });
+
+                    const newTexts = clipboard.texts.map(t => {
+                        const newId = `text-${Date.now()}-${Math.random()}`;
+                        newIds.add(newId);
+                        return { ...t, id: newId, x: t.x + offset, y: t.y + offset };
+                    });
+
+                    setCircles(prev => [...prev, ...newCircles]);
+                    setLines(prev => [...prev, ...newLines]);
+                    setRects(prev => [...prev, ...newRects]);
+                    setTexts(prev => [...prev, ...newTexts]);
+                    setSelectedIds(newIds);
+                }
                 return;
             }
 
@@ -751,7 +813,7 @@ const Whiteboard = () => {
 
     return (
         <>
-            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-white px-4 py-2 rounded shadow border z-10 flex flex-col items-center select-none pointer-events-none">
+            <div className="absolute bottom-4 right-4 bg-white px-4 py-2 rounded shadow border z-10 flex flex-col items-center select-none pointer-events-none">
                 <div className="pointer-events-auto">
                     Current Mode: <span className="font-bold">{modeText}</span>
                 </div>

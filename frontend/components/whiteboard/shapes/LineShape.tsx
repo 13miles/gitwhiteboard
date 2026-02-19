@@ -26,7 +26,7 @@ const LineShape = ({
         x: line.x,
         y: line.y,
         points: line.points,
-        stroke: isSelected ? '#3b82f6' : line.stroke,
+        stroke: isSelected ? '#eab308' : line.stroke,
         strokeWidth: isSelected ? 4 : line.strokeWidth,
         hitStrokeWidth: LINE_HIT_STROKE_WIDTH,
         tension: 0,
@@ -43,7 +43,7 @@ const LineShape = ({
                 {...commonProps}
                 pointerLength={ARROW_POINTER_LENGTH}
                 pointerWidth={ARROW_POINTER_WIDTH}
-                fill={isSelected ? '#3b82f6' : (line.stroke || 'black')}
+                fill={isSelected ? '#eab308' : (line.stroke || 'black')}
             />
         );
     }

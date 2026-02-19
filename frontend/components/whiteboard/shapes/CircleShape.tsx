@@ -38,9 +38,9 @@ const CircleShape = ({
             x={0}
             y={0}
             radius={circle.radius}
-            stroke={isSelected || isConnectStart ? '#3b82f6' : (circle.stroke || 'black')}
+            stroke={isSelected || isConnectStart ? '#eab308' : (circle.stroke || 'black')}
             strokeWidth={isSelected || isConnectStart ? 4 : 2}
-            fill={isConnectStart ? 'rgba(59, 130, 246, 0.1)' : (circle.fill || 'transparent')}
+            fill={isConnectStart ? 'rgba(234, 179, 8, 0.2)' : (circle.fill || 'transparent')}
         />
         <Text
             text={circle.text}

@@ -12,7 +12,8 @@ const SessionToolbar = ({ onSave, onLoad, onClear, fileInputRef }: SessionToolba
     <div className="absolute top-4 left-4 flex gap-2 z-10">
         <button
             onClick={onSave}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded shadow text-sm font-medium"
+            className="text-white px-3 py-1 rounded shadow text-sm font-medium transition-colors hover:opacity-90"
+            style={{ backgroundColor: '#155dfc' }}
         >
             Save
         </button>

@@ -233,7 +233,7 @@ const Whiteboard = () => {
                 const colorMap: Record<string, { stroke: string; fill?: string; textFill?: string }> = {
                     '1': { stroke: 'black', fill: 'transparent', textFill: 'black' },
                     '2': { stroke: '#ef4444', fill: '#ef4444', textFill: 'white' }, // Red-500 (Clear)
-                    '3': { stroke: '#1d4ed8', fill: '#1d4ed8', textFill: 'white' }, // Blue-700
+                    '3': { stroke: '#155dfc', fill: '#155dfc', textFill: 'white' }, // Custom Blue
                     '4': { stroke: '#22c55e', fill: '#22c55e', textFill: 'white' }, // Green-500 (Load)
                     '5': { stroke: 'gray', fill: 'gray', textFill: 'white' },
                     '6': { stroke: 'white', fill: 'transparent', textFill: 'black' },
@@ -816,13 +816,16 @@ const Whiteboard = () => {
                     <Transformer
                         ref={trRef}
                         boundBoxFunc={(oldBox, newBox) => (newBox.width < 5 || newBox.height < 5) ? oldBox : newBox}
+                        borderStroke="#eab308"
+                        anchorStroke="#eab308"
+                        anchorFill="#fef08a" // Yellow-200
                     />
 
                     {selection?.isSelecting && !isPanning && (
                         <KonvaLine
                             x={selection.x} y={selection.y}
                             points={[0, 0, selection.width, 0, selection.width, selection.height, 0, selection.height]}
-                            closed fill="rgba(59, 130, 246, 0.2)" stroke="#3b82f6" listening={false}
+                            closed fill="rgba(234, 179, 8, 0.2)" stroke="#eab308" listening={false}
                         />
                     )}
                 </Layer>

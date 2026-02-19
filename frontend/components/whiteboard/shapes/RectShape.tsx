@@ -39,7 +39,7 @@ const RectShape = ({
             y={0}
             width={rect.width}
             height={rect.height}
-            stroke={isSelected ? '#3b82f6' : (rect.stroke || 'black')}
+            stroke={isSelected ? '#eab308' : (rect.stroke || 'black')}
             strokeWidth={isSelected ? 4 : 2}
             fill={rect.fill || 'transparent'}
         />

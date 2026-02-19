@@ -1,10 +1,17 @@
 import type { NextConfig } from "next";
 import { execSync } from 'child_process';
 
-const commitHash = execSync('git rev-parse --short HEAD').toString().trim();
+const commitHash = (() => {
+  try {
+    return execSync('git rev-parse --short HEAD').toString().trim();
+  } catch (e) {
+    return 'unknown';
+  }
+})();
 
 const nextConfig: NextConfig = {
   /* config options here */
+  output: 'standalone',
   reactCompiler: true,
   env: {
     NEXT_PUBLIC_COMMIT_HASH: commitHash,

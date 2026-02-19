@@ -19,7 +19,7 @@ const ShortcutHelp = () => {
 
             {/* Content (Right) */}
             <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isOpen ? 'max-w-[400px] opacity-100' : 'max-w-0 opacity-0'}`}>
-                <div className="bg-white rounded-r shadow-lg border-l border-gray-100 p-4 min-w-[300px]">
+                <div className="bg-white rounded-r shadow-lg border-l border-gray-100 p-4 whitespace-nowrap">
                     <div className="flex items-center gap-1 mb-2">
                         <p className="text-sm font-bold">단축키 도움말</p>
                         <span className="text-xs text-black mt-0.5">{process.env.NEXT_PUBLIC_COMMIT_HASH}</span>

@@ -249,6 +249,51 @@ const Whiteboard = () => {
                 return;
             }
 
+            // Edit mode (E key)
+            if ((e.key === 'e' || e.key === 'E') && s.selectedIds.size === 1) {
+                const id = Array.from(s.selectedIds)[0];
+                const stage = stageRef.current;
+                const node = shapeRefs.current[id];
+
+                if (node && stage) {
+                    // Calculate position
+                    const scale = stage.scaleX();
+                    const pos = stage.absolutePosition();
+                    const nodePos = node.absolutePosition();
+
+                    const rect = s.rects.find(r => r.id === id);
+                    const circle = s.circles.find(c => c.id === id);
+                    const text = s.texts.find(t => t.id === id);
+
+                    if (rect) {
+                        setEditPos({
+                            x: nodePos.x,
+                            y: nodePos.y,
+                            w: rect.width * node.scaleX(),
+                            h: rect.height * node.scaleY()
+                        });
+                        setEditingId(id);
+                    } else if (circle) {
+                        setEditPos({
+                            x: nodePos.x - (circle.radius * node.scaleX()),
+                            y: nodePos.y - (circle.radius * node.scaleY()),
+                            w: circle.radius * 2 * node.scaleX(),
+                            h: circle.radius * 2 * node.scaleY()
+                        });
+                        setEditingId(id);
+                    } else if (text) {
+                        setEditPos({
+                            x: nodePos.x,
+                            y: nodePos.y,
+                            w: Math.max(TEXT_EDIT_MIN_WIDTH, node.width() * node.scaleX()),
+                            h: Math.max(TEXT_EDIT_HEIGHT, node.height() * node.scaleY())
+                        });
+                        setEditingId(id);
+                    }
+                }
+                return;
+            }
+
             // Mode toggles
             if (e.key === 'l' || e.key === 'L') {
                 setMode(prev => prev === 'select' ? 'line' : prev === 'line' ? 'arrow' : 'select');
@@ -407,8 +452,20 @@ const Whiteboard = () => {
             if (!id) return;
             const sx = node.scaleX(), sy = node.scaleY();
             node.scaleX(1); node.scaleY(1);
-            if (id.startsWith('rect'))
-                setRects(prev => prev.map(r => r.id === id ? { ...r, x: node.x(), y: node.y(), width: Math.max(5, node.width() * sx), height: Math.max(5, node.height() * sy) } : r));
+            if (id.startsWith('rect')) {
+                setRects(prev => prev.map(r => {
+                    if (r.id === id) {
+                        return {
+                            ...r,
+                            x: node.x(),
+                            y: node.y(),
+                            width: Math.max(5, r.width * sx),
+                            height: Math.max(5, r.height * sy)
+                        };
+                    }
+                    return r;
+                }));
+            }
             else if (id.startsWith('circle'))
                 setCircles(prev => prev.map(c => c.id === id ? { ...c, x: node.x(), y: node.y(), radius: Math.max(5, c.radius * Math.max(sx, sy)) } : c));
             else if (id.startsWith('text'))

@@ -48,10 +48,11 @@ const CircleShape = ({
             fill={circle.textFill || 'black'}
             align="center"
             verticalAlign="middle"
-            offsetX={CIRCLE_TEXT_OFFSET_X}
-            offsetY={CIRCLE_TEXT_OFFSET_Y}
-            width={CIRCLE_TEXT_WIDTH}
-            height={CIRCLE_TEXT_HEIGHT}
+            offsetY={circle.radius}
+            offsetX={circle.radius}
+            width={circle.radius * 2}
+            height={circle.radius * 2}
+            wrap="word"
             listening={false}
             fontFamily="Consolas, monospace"
         />

@@ -3,10 +3,10 @@
 // Circle
 export const DEFAULT_CIRCLE_RADIUS = 37.5;
 export const CIRCLE_TEXT_FONT_SIZE = 21;
-export const CIRCLE_TEXT_WIDTH = 30;
-export const CIRCLE_TEXT_HEIGHT = 21;
-export const CIRCLE_TEXT_OFFSET_X = 15;
-export const CIRCLE_TEXT_OFFSET_Y = 10.5;
+export const CIRCLE_TEXT_WIDTH = 60;
+export const CIRCLE_TEXT_HEIGHT = 60;
+export const CIRCLE_TEXT_OFFSET_X = 30;
+export const CIRCLE_TEXT_OFFSET_Y = 30;
 
 // Rect
 export const DEFAULT_RECT_SIZE_SM = 75;  // initial square size

@@ -232,9 +232,9 @@ const Whiteboard = () => {
             if (['1', '2', '3', '4', '5', '6'].includes(e.key) && s.selectedIds.size > 0) {
                 const colorMap: Record<string, { stroke: string; fill?: string; textFill?: string }> = {
                     '1': { stroke: 'black', fill: 'transparent', textFill: 'black' },
-                    '2': { stroke: 'red', fill: 'red', textFill: 'white' },
-                    '3': { stroke: '#1d4ed8', fill: '#1d4ed8', textFill: 'white' },
-                    '4': { stroke: '#15803d', fill: '#15803d', textFill: 'white' },
+                    '2': { stroke: '#ef4444', fill: '#ef4444', textFill: 'white' }, // Red-500 (Clear)
+                    '3': { stroke: '#1d4ed8', fill: '#1d4ed8', textFill: 'white' }, // Blue-700
+                    '4': { stroke: '#22c55e', fill: '#22c55e', textFill: 'white' }, // Green-500 (Load)
                     '5': { stroke: 'gray', fill: 'gray', textFill: 'white' },
                     '6': { stroke: 'white', fill: 'transparent', textFill: 'black' },
                 };

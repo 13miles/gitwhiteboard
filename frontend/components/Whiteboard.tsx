@@ -62,6 +62,7 @@ const Whiteboard = () => {
     const trRef = useRef<Konva.Transformer>(null);
     const stageRef = useRef<Konva.Stage>(null);
     const shapeRefs = useRef<{ [key: string]: Konva.Node | null }>({});
+    const dragSelectedIdsRef = useRef<Set<string>>(new Set());
     const [size, setSize] = useState({ width: 0, height: 0 });
 
     // ── Hooks ─────────────────────────────
@@ -406,6 +407,41 @@ const Whiteboard = () => {
                         setTexts(prev => prev.map(t => newYMap.has(t.id) ? { ...t, y: newYMap.get(t.id)! } : t));
                     }
                 }
+
+                // Align top (S key)
+                if (e.key === 's' || e.key === 'S') {
+                    if (s.selectedIds.size > 1) {
+                        let minY = Infinity;
+                        [...s.circles, ...s.lines, ...s.rects, ...s.texts, ...s.images]
+                            .forEach(item => { if (s.selectedIds.has(item.id) && item.y < minY) minY = item.y; });
+                        if (minY !== Infinity) {
+                            saveHistory();
+                            setCircles(prev => prev.map(c => s.selectedIds.has(c.id) ? { ...c, y: minY } : c));
+                            setLines(prev => prev.map(l => s.selectedIds.has(l.id) ? { ...l, y: minY } : l));
+                            setRects(prev => prev.map(r => s.selectedIds.has(r.id) ? { ...r, y: minY } : r));
+                            setTexts(prev => prev.map(t => s.selectedIds.has(t.id) ? { ...t, y: minY } : t));
+                            setImages(prev => prev.map(i => s.selectedIds.has(i.id) ? { ...i, y: minY } : i));
+                        }
+                    }
+                }
+
+                // Distribute horizontally (W key)
+                if (e.key === 'w' || e.key === 'W') {
+                    const selectedItems = [...s.circles, ...s.lines, ...s.rects, ...s.texts]
+                        .filter(item => s.selectedIds.has(item.id))
+                        .map(item => ({ id: item.id, x: item.x }));
+                    if (selectedItems.length > 2) {
+                        saveHistory();
+                        selectedItems.sort((a, b) => a.x - b.x);
+                        const min = selectedItems[0].x;
+                        const interval = (selectedItems[selectedItems.length - 1].x - min) / (selectedItems.length - 1);
+                        const newXMap = new Map(selectedItems.map((item, i) => [item.id, min + interval * i]));
+                        setCircles(prev => prev.map(c => newXMap.has(c.id) ? { ...c, x: newXMap.get(c.id)! } : c));
+                        setLines(prev => prev.map(l => newXMap.has(l.id) ? { ...l, x: newXMap.get(l.id)! } : l));
+                        setRects(prev => prev.map(r => newXMap.has(r.id) ? { ...r, x: newXMap.get(r.id)! } : r));
+                        setTexts(prev => prev.map(t => newXMap.has(t.id) ? { ...t, x: newXMap.get(t.id)! } : t));
+                    }
+                }
             }
         };
 
@@ -479,8 +515,14 @@ const Whiteboard = () => {
     const handleDragStart = (id: string, e: KonvaEventObject<DragEvent>) => {
         if (mode !== 'select' || isPanning || editingId) return;
         saveHistory();
-        if (!selectedIds.has(id)) setSelectedIds(new Set([id]));
-        const newSelected = selectedIds.has(id) ? selectedIds : new Set([id]);
+
+        let newSelected = new Set(selectedIds);
+        if (!newSelected.has(id)) {
+            newSelected = new Set([id]);
+            setSelectedIds(newSelected);
+        }
+        dragSelectedIdsRef.current = newSelected;
+
         newSelected.forEach(sid => {
             const node = shapeRefs.current[sid];
             if (node) node.setAttr('startPos', { x: node.x(), y: node.y() });
@@ -494,7 +536,8 @@ const Whiteboard = () => {
         if (!startPos) return;
         const dx = draggedNode.x() - startPos.x;
         const dy = draggedNode.y() - startPos.y;
-        selectedIds.forEach(sid => {
+
+        dragSelectedIdsRef.current.forEach(sid => {
             if (sid !== id) {
                 const node = shapeRefs.current[sid];
                 const sp = node?.getAttr('startPos') as { x: number; y: number } | undefined;
@@ -505,20 +548,28 @@ const Whiteboard = () => {
 
     const handleDragEnd = (id: string) => {
         if (mode !== 'select' || isPanning || editingId) return;
-        const newSelected = selectedIds.has(id) ? selectedIds : new Set([id]);
+
+        // dragSelectedIdsRef is already set from start, but we can sync state just in case
+        const currentSelected = dragSelectedIdsRef.current.size > 0 ? dragSelectedIdsRef.current : selectedIds;
+
+        // Sync React state with Konva node positions
         const sync = <T extends { id: string }>(prev: T[], getId: (item: T) => string) =>
             prev.map(item => {
-                if (newSelected.has(getId(item))) {
+                if (currentSelected.has(getId(item))) {
                     const node = shapeRefs.current[getId(item)];
                     return node ? { ...item, x: node.x(), y: node.y() } : item;
                 }
                 return item;
             });
+
         setCircles(prev => sync(prev, c => c.id));
         setLines(prev => sync(prev, l => l.id));
         setRects(prev => sync(prev, r => r.id));
         setTexts(prev => sync(prev, t => t.id));
         setImages(prev => sync(prev, i => i.id));
+
+        // Clear drag ref (optional, but good for cleanup)
+        dragSelectedIdsRef.current = new Set();
     };
 
     // ── Click handler ─────────────────────

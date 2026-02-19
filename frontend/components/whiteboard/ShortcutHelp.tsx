@@ -20,7 +20,10 @@ const ShortcutHelp = () => {
             {/* Content (Right) */}
             <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isOpen ? 'max-w-[400px] opacity-100' : 'max-w-0 opacity-0'}`}>
                 <div className="bg-white rounded-r shadow-lg border-l border-gray-100 p-4 min-w-[300px]">
-                    <p className="text-sm font-bold mb-2">단축키 도움말</p>
+                    <div className="flex items-center gap-1 mb-2">
+                        <p className="text-sm font-bold">단축키 도움말</p>
+                        <span className="text-xs text-black mt-0.5">{process.env.NEXT_PUBLIC_COMMIT_HASH}</span>
+                    </div>
                     <ul className="text-xs list-none space-y-1 text-gray-700">
                         <li><kbd className="font-mono bg-gray-100 px-1 rounded border">C</kbd> 원 생성 &nbsp;<kbd className="font-mono bg-gray-100 px-1 rounded border">R</kbd> 사각형 생성</li>
                         <li><kbd className="font-mono bg-gray-100 px-1 rounded border">RR/RRR</kbd> 큰 사각형 생성</li>
@@ -29,6 +32,7 @@ const ShortcutHelp = () => {
                         <li><kbd className="font-mono bg-gray-100 px-1 rounded border">Space</kbd> 캔버스 이동(Pan)</li>
                         <li><kbd className="font-mono bg-gray-100 px-1 rounded border">D</kbd> / <kbd className="font-mono bg-gray-100 px-1 rounded border">Delete</kbd> 선택 삭제</li>
                         <li><kbd className="font-mono bg-gray-100 px-1 rounded border">A</kbd> 좌측 정렬 &nbsp;<kbd className="font-mono bg-gray-100 px-1 rounded border">Q</kbd> 수직 균등 배분</li>
+                        <li><kbd className="font-mono bg-gray-100 px-1 rounded border">S</kbd> 위쪽 정렬 &nbsp;<kbd className="font-mono bg-gray-100 px-1 rounded border">W</kbd> 수평 균등 배분</li>
                         <li><kbd className="font-mono bg-gray-100 px-1 rounded border">1</kbd>~<kbd className="font-mono bg-gray-100 px-1 rounded border">6</kbd> 색상 변경</li>
                         <li><kbd className="font-mono bg-gray-100 px-1 rounded border">Ctrl+C/V</kbd> 복사·붙여넣기</li>
                         <li><kbd className="font-mono bg-gray-100 px-1 rounded border">Ctrl+Z</kbd> 실행 취소</li>

@@ -1,0 +1,1026 @@
+'use client';
+
+import React, { useState, useEffect, useRef } from 'react';
+import { Stage, Layer, Circle, Group, Text, Rect, Line, Arrow } from 'react-konva';
+import Konva from 'konva';
+
+interface CircleData {
+    id: string;
+    x: number;
+    y: number;
+    radius: number;
+    text: string;
+    stroke?: string;
+}
+
+interface RectData {
+    id: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    text?: string;
+    stroke?: string;
+}
+
+interface LineData {
+    id: string;
+    x: number;
+    y: number;
+    points: number[];
+    stroke: string;
+    strokeWidth: number;
+    type: 'line' | 'arrow';
+}
+
+interface TextData {
+    id: string;
+    x: number;
+    y: number;
+    text: string;
+    fontSize: number;
+    fill: string;
+}
+
+const Whiteboard = () => {
+    const [circles, setCircles] = useState<CircleData[]>([]);
+    const [lines, setLines] = useState<LineData[]>([]);
+    const [rects, setRects] = useState<RectData[]>([]);
+    const [texts, setTexts] = useState<TextData[]>([]);
+
+    const [history, setHistory] = useState<{ circles: CircleData[], lines: LineData[], rects: RectData[], texts: TextData[] }[]>([]);
+
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+    const [mode, setMode] = useState<'select' | 'line' | 'arrow' | 'text'>('select');
+
+    const [tempLineStartId, setTempLineStartId] = useState<string | null>(null);
+
+    const [isPanning, setIsPanning] = useState(false);
+
+    const [lastRPressTime, setLastRPressTime] = useState(0);
+
+    // Text Editing
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editPos, setEditPos] = useState<{ x: number, y: number, w: number, h: number } | null>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    // Drag Drawing Line
+    const [drawingLine, setDrawingLine] = useState<{ startX: number, startY: number, endX: number, endY: number } | null>(null);
+
+    const [selection, setSelection] = useState<{
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        startX: number;
+        startY: number;
+        isSelecting: boolean;
+    } | null>(null);
+
+    const stageRef = useRef<Konva.Stage>(null);
+    const [size, setSize] = useState({ width: 0, height: 0 });
+    const shapeRefs = useRef<{ [key: string]: Konva.Node | null }>({});
+
+    useEffect(() => {
+        setSize({ width: window.innerWidth, height: window.innerHeight });
+
+        const handleResize = () => {
+            setSize({ width: window.innerWidth, height: window.innerHeight });
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    useEffect(() => {
+        if (editingId && textareaRef.current) {
+            setTimeout(() => {
+                if (textareaRef.current) {
+                    textareaRef.current.focus();
+                    const val = textareaRef.current.value;
+                    textareaRef.current.setSelectionRange(val.length, val.length);
+                }
+            }, 0);
+        }
+    }, [editingId]);
+
+    const getRandomHex2 = () => {
+        const chars = '0123456789abcdef';
+        let result = '';
+        for (let i = 0; i < 2; i++) {
+            result += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return result;
+    };
+
+    const saveHistory = () => {
+        setHistory(prev => [...prev.slice(-19), {
+            circles: structuredClone(circles),
+            lines: structuredClone(lines),
+            rects: structuredClone(rects),
+            texts: structuredClone(texts)
+        }]);
+    };
+
+    const undo = () => {
+        setHistory(prev => {
+            if (prev.length === 0) return prev;
+            const lastState = prev[prev.length - 1];
+            const newHistory = prev.slice(0, prev.length - 1);
+
+            setCircles(lastState.circles);
+            setLines(lastState.lines);
+            setRects(lastState.rects || []);
+            setTexts(lastState.texts || []);
+            setSelectedIds(new Set());
+            setTempLineStartId(null);
+            setEditingId(null);
+
+            return newHistory;
+        });
+    };
+
+    const getRelativePointerPosition = () => {
+        const stage = stageRef.current;
+        if (!stage) return { x: 0, y: 0 };
+        const pointer = stage.getPointerPosition();
+        if (!pointer) return { x: 0, y: 0 };
+        const scale = stage.scaleX();
+        const stagePos = stage.position();
+
+        return {
+            x: (pointer.x - stagePos.x) / scale,
+            y: (pointer.y - stagePos.y) / scale
+        };
+    };
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (editingId) {
+                if (e.key === 'Escape') {
+                    setEditingId(null);
+                }
+                return;
+            }
+
+            if (e.key === ' ' && !e.repeat) {
+                setIsPanning(true);
+                return;
+            }
+
+            if (isPanning) return;
+
+            const metaPressed = e.shiftKey || e.ctrlKey || e.metaKey;
+
+            if ((e.key === 'z' || e.key === 'Z') && (e.ctrlKey || e.metaKey)) {
+                undo();
+                return;
+            }
+
+            if (['1', '2', '3', '4', '5'].includes(e.key) && selectedIds.size > 0) {
+                const colorMap: { [key: string]: string } = {
+                    '1': 'black',
+                    '2': 'red',
+                    '3': 'green',
+                    '4': 'gray',
+                    '5': 'white'
+                };
+                const newColor = colorMap[e.key];
+
+                saveHistory();
+                setCircles(prev => prev.map(c => selectedIds.has(c.id) ? { ...c, stroke: newColor } : c));
+                setRects(prev => prev.map(r => selectedIds.has(r.id) ? { ...r, stroke: newColor } : r));
+                setLines(prev => prev.map(l => selectedIds.has(l.id) ? { ...l, stroke: newColor } : l));
+                setTexts(prev => prev.map(t => selectedIds.has(t.id) ? { ...t, fill: newColor } : t));
+                return;
+            }
+
+            if (e.key === 'l' || e.key === 'L') {
+                setMode(prev => {
+                    if (prev === 'select') return 'line';
+                    if (prev === 'line') return 'arrow';
+                    return 'select';
+                });
+                setSelectedIds(new Set());
+                setTempLineStartId(null);
+            }
+            if (e.key === 't' || e.key === 'T') {
+                setMode(prev => prev === 'text' ? 'select' : 'text');
+                setSelectedIds(new Set());
+                setTempLineStartId(null);
+            }
+
+            if (e.key === 'Escape') {
+                setMode('select');
+                setTempLineStartId(null);
+                setDrawingLine(null);
+            }
+
+            if (mode === 'select') {
+                if (e.key === 'c' || e.key === 'C') {
+                    if (selectedIds.size === 1) {
+                        const selectedId = Array.from(selectedIds)[0];
+                        const selectedRect = rects.find(r => r.id === selectedId);
+
+                        if (selectedRect) {
+                            const node = shapeRefs.current[selectedId];
+                            if (node) {
+                                saveHistory();
+                                const absPos = node.getAbsolutePosition();
+                                setEditPos({
+                                    x: absPos.x,
+                                    y: absPos.y,
+                                    w: selectedRect.width,
+                                    h: selectedRect.height
+                                });
+                                setEditingId(selectedId);
+                            }
+                            return;
+                        }
+                    }
+
+                    saveHistory();
+                    const { x, y } = getRelativePointerPosition();
+
+                    const newCircle: CircleData = {
+                        id: `circle-${Date.now()}`,
+                        x: x || 100,
+                        y: y || 100,
+                        radius: 37.5,
+                        text: getRandomHex2(),
+                        stroke: 'black'
+                    };
+                    setCircles((prev) => [...prev, newCircle]);
+                }
+
+                if (e.key === 'r' || e.key === 'R') {
+                    const now = Date.now();
+                    const isDoubleTap = now - lastRPressTime < 400;
+                    setLastRPressTime(now);
+
+                    if (isDoubleTap) {
+                        setRects(prev => {
+                            if (prev.length === 0) return prev;
+                            const lastRect = prev[prev.length - 1];
+                            const newRects = [...prev];
+                            newRects[newRects.length - 1] = {
+                                ...lastRect,
+                                width: 150,
+                            };
+                            return newRects;
+                        });
+                    } else {
+                        saveHistory();
+                        const { x, y } = getRelativePointerPosition();
+                        const width = 75;
+                        const height = 75;
+
+                        const newRect: RectData = {
+                            id: `rect-${Date.now()}`,
+                            x: (x || 100) - width / 2,
+                            y: (y || 100) - height / 2,
+                            width,
+                            height,
+                            text: '',
+                            stroke: 'black'
+                        };
+                        setRects(prev => [...prev, newRect]);
+                    }
+                }
+
+                if (e.key === 'd' || e.key === 'D' || e.key === 'Backspace' || e.key === 'Delete') {
+                    if (selectedIds.size > 0) {
+                        saveHistory();
+                        setCircles((prev) => prev.filter((c) => !selectedIds.has(c.id)));
+                        setLines((prev) => prev.filter((l) => !selectedIds.has(l.id)));
+                        setRects((prev) => prev.filter((r) => !selectedIds.has(r.id)));
+                        setTexts((prev) => prev.filter((t) => !selectedIds.has(t.id)));
+                        setSelectedIds(new Set());
+                    }
+                }
+
+                if (e.key === 'a' || e.key === 'A') {
+                    if (selectedIds.size > 1) {
+                        let minX = Infinity;
+                        circles.forEach(c => { if (selectedIds.has(c.id) && c.x < minX) minX = c.x; });
+                        lines.forEach(l => { if (selectedIds.has(l.id) && l.x < minX) minX = l.x; });
+                        rects.forEach(r => { if (selectedIds.has(r.id) && r.x < minX) minX = r.x; });
+                        texts.forEach(t => { if (selectedIds.has(t.id) && t.x < minX) minX = t.x; });
+
+                        if (minX !== Infinity) {
+                            saveHistory();
+                            setCircles(prev => prev.map(c => selectedIds.has(c.id) ? { ...c, x: minX } : c));
+                            setLines(prev => prev.map(l => selectedIds.has(l.id) ? { ...l, x: minX } : l));
+                            setRects(prev => prev.map(r => selectedIds.has(r.id) ? { ...r, x: minX } : r));
+                            setTexts(prev => prev.map(t => selectedIds.has(t.id) ? { ...t, x: minX } : t));
+                        }
+                    }
+                }
+
+                if (e.key === 'e' || e.key === 'E') {
+                    if (selectedIds.size === 1) {
+                        const selectedId = Array.from(selectedIds)[0];
+                        // Check if it's a TextData
+                        const selectedText = texts.find(t => t.id === selectedId);
+
+                        if (selectedText) {
+                            const node = shapeRefs.current[selectedId];
+                            if (node) {
+                                saveHistory();
+                                const absPos = node.getAbsolutePosition();
+                                // For Text object, width/height might need to be retrieved or approximated
+                                // node.width() * node.scaleX()
+                                const width = node.width() * node.scaleX();
+                                const height = node.height() * node.scaleY();
+
+                                setEditPos({
+                                    x: absPos.x,
+                                    y: absPos.y,
+                                    w: Math.max(width, 200), // Ensure min width for editing
+                                    h: Math.max(height, 30)
+                                });
+                                setEditingId(selectedId);
+                            }
+                        }
+                    }
+                }
+
+                if (e.key === 'q' || e.key === 'Q') {
+                    const selectedItems: { id: string, y: number }[] = [];
+                    circles.forEach(c => { if (selectedIds.has(c.id)) selectedItems.push({ id: c.id, y: c.y }); });
+                    lines.forEach(l => { if (selectedIds.has(l.id)) selectedItems.push({ id: l.id, y: l.y }); });
+                    rects.forEach(r => { if (selectedIds.has(r.id)) selectedItems.push({ id: r.id, y: r.y }); });
+                    texts.forEach(t => { if (selectedIds.has(t.id)) selectedItems.push({ id: t.id, y: t.y }); });
+
+                    if (selectedItems.length > 2) {
+                        saveHistory();
+                        selectedItems.sort((a, b) => a.y - b.y);
+                        const minY = selectedItems[0].y;
+                        const maxY = selectedItems[selectedItems.length - 1].y;
+                        const interval = (maxY - minY) / (selectedItems.length - 1);
+
+                        const newYMap = new Map<string, number>();
+                        selectedItems.forEach((item, idx) => {
+                            newYMap.set(item.id, minY + interval * idx);
+                        });
+
+                        setCircles(prev => prev.map(c => newYMap.has(c.id) ? { ...c, y: newYMap.get(c.id)! } : c));
+                        setLines(prev => prev.map(l => newYMap.has(l.id) ? { ...l, y: newYMap.get(l.id)! } : l));
+                        setRects(prev => prev.map(r => newYMap.has(r.id) ? { ...r, y: newYMap.get(r.id)! } : r));
+                        setTexts(prev => prev.map(t => newYMap.has(t.id) ? { ...t, y: newYMap.get(t.id)! } : t));
+                    }
+                }
+            }
+        };
+
+        const handleKeyUp = (e: KeyboardEvent) => {
+            if (e.key === ' ') {
+                setIsPanning(false);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
+        };
+    }, [selectedIds, size, circles, lines, rects, texts, mode, history, isPanning, lastRPressTime, editingId]);
+
+    const onMouseDown = (e: any) => {
+        if (isPanning) return;
+        if (editingId) return;
+
+        const clickedOnEmpty = e.target === e.target.getStage();
+
+        if (mode === 'text' && clickedOnEmpty) {
+            const { x, y } = getRelativePointerPosition();
+            saveHistory();
+            const newTextId = `text-${Date.now()}`;
+            const newText: TextData = {
+                id: newTextId,
+                x: x,
+                y: y,
+                text: '',
+                fontSize: 20,
+                fill: 'black'
+            };
+            setTexts(prev => [...prev, newText]);
+
+            // Calculate absolute position efficiently
+            const stage = stageRef.current;
+            const scale = stage ? stage.scaleX() : 1;
+            const stagePos = stage ? stage.absolutePosition() : { x: 0, y: 0 };
+
+            // Convert logic: absolute = (relative * scale) + stagePos
+            // We use the recently calculated relative x, y
+            const absX = x * scale + stagePos.x;
+            const absY = y * scale + stagePos.y;
+
+            setEditPos({
+                x: absX,
+                y: absY,
+                w: 200,
+                h: 30
+            });
+            setEditingId(newTextId);
+            return;
+        }
+
+        if (mode === 'line' || mode === 'arrow') {
+            if (clickedOnEmpty) {
+                const { x, y } = getRelativePointerPosition();
+                setDrawingLine({ startX: x, startY: y, endX: x, endY: y });
+                setTempLineStartId(null);
+            }
+            return;
+        }
+
+        if (!clickedOnEmpty) return;
+
+        const metaPressed = e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey;
+        if (!metaPressed) {
+            setSelectedIds(new Set());
+        }
+
+        const { x, y } = getRelativePointerPosition();
+        setSelection({
+            x,
+            y,
+            width: 0,
+            height: 0,
+            startX: x,
+            startY: y,
+            isSelecting: true,
+        });
+    };
+
+    const onMouseMove = (e: any) => {
+        if (isPanning) return;
+
+        if (drawingLine) {
+            const { x, y } = getRelativePointerPosition();
+            setDrawingLine(prev => prev ? { ...prev, endX: x, endY: y } : null);
+            return;
+        }
+
+        if (!selection || !selection.isSelecting) return;
+
+        const { x, y } = getRelativePointerPosition();
+        const boxX = Math.min(x, selection.startX);
+        const boxY = Math.min(y, selection.startY);
+        const width = Math.abs(x - selection.startX);
+        const height = Math.abs(y - selection.startY);
+
+        setSelection({
+            ...selection,
+            x: boxX,
+            y: boxY,
+            width,
+            height,
+        });
+    };
+
+    const onMouseUp = (e: any) => {
+        if (isPanning) return;
+
+        if (drawingLine) {
+            saveHistory();
+            const newLine: LineData = {
+                id: `line-${Date.now()}`,
+                x: 0,
+                y: 0,
+                points: [drawingLine.startX, drawingLine.startY, drawingLine.endX, drawingLine.endY],
+                stroke: 'black',
+                strokeWidth: 2,
+                type: mode as 'line' | 'arrow'
+            };
+            setLines(prev => [...prev, newLine]);
+            setDrawingLine(null);
+            return;
+        }
+
+        if (!selection || !selection.isSelecting) return;
+
+        const selBox = {
+            x1: selection.x,
+            y1: selection.y,
+            x2: selection.x + selection.width,
+            y2: selection.y + selection.height,
+        };
+
+        const newSelected = new Set(selectedIds);
+        circles.forEach((circle) => {
+            const r = circle.radius;
+            const cBox = { x1: circle.x - r, y1: circle.y - r, x2: circle.x + r, y2: circle.y + r };
+            if (selBox.x1 < cBox.x2 && selBox.x2 > cBox.x1 && selBox.y1 < cBox.y2 && selBox.y2 > cBox.y1) {
+                newSelected.add(circle.id);
+            }
+        });
+        rects.forEach((r) => {
+            if (
+                selBox.x1 < r.x + r.width &&
+                selBox.x2 > r.x &&
+                selBox.y1 < r.y + r.height &&
+                selBox.y2 > r.y
+            ) {
+                newSelected.add(r.id);
+            }
+        });
+        texts.forEach((t) => {
+            // Simple point check not enough, approximate box
+            // Use approximate width if not known, or shapeRef if available?
+            // Let's assume some width/height for hit test or use logic similar to others
+            const node = shapeRefs.current[t.id];
+            let width = 100;
+            let height = 20;
+            if (node) {
+                width = node.width() * node.scaleX();
+                height = node.height() * node.scaleY();
+            }
+
+            if (
+                selBox.x1 < t.x + width &&
+                selBox.x2 > t.x &&
+                selBox.y1 < t.y + height &&
+                selBox.y2 > t.y
+            ) {
+                newSelected.add(t.id);
+            }
+        });
+        lines.forEach((line) => {
+            const x1 = line.points[0] + line.x;
+            const y1 = line.points[1] + line.y;
+            const x2 = line.points[2] + line.x;
+            const y2 = line.points[3] + line.y;
+            const minX = Math.min(x1, x2);
+            const maxX = Math.max(x1, x2);
+            const minY = Math.min(y1, y2);
+            const maxY = Math.max(y1, y2);
+            if (selBox.x1 < maxX && selBox.x2 > minX && selBox.y1 < maxY && selBox.y2 > minY) {
+                newSelected.add(line.id);
+            }
+        });
+
+        setSelectedIds(newSelected);
+        setSelection(null);
+    };
+
+    const handleDragStart = (id: string, e: any) => {
+        if (mode !== 'select' || isPanning || editingId) return;
+        saveHistory();
+
+        if (!selectedIds.has(id)) {
+            setSelectedIds(new Set([id]));
+        }
+
+        selectedIds.forEach(selectedId => {
+            const node = shapeRefs.current[selectedId];
+            if (node) {
+                node.setAttr('startPos', { x: node.x(), y: node.y() });
+            }
+        });
+        if (!selectedIds.has(id)) {
+            const node = shapeRefs.current[id];
+            if (node) node.setAttr('startPos', { x: node.x(), y: node.y() });
+        }
+    };
+
+    const handleDragMove = (id: string, e: any) => {
+        if (mode !== 'select' || isPanning || editingId) return;
+        if (!selectedIds.has(id)) return;
+
+        const draggedNode = e.target;
+        const startPos = draggedNode.getAttr('startPos');
+        if (!startPos) return;
+
+        const dx = draggedNode.x() - startPos.x;
+        const dy = draggedNode.y() - startPos.y;
+
+        selectedIds.forEach(selectedId => {
+            if (selectedId !== id) {
+                const node = shapeRefs.current[selectedId];
+                const nodeStartPos = node?.getAttr('startPos');
+                if (node && nodeStartPos) {
+                    node.x(nodeStartPos.x + dx);
+                    node.y(nodeStartPos.y + dy);
+                }
+            }
+        });
+    };
+
+    const handleDragEnd = (id: string, e: any) => {
+        if (mode !== 'select' || isPanning || editingId) return;
+
+        setCircles(prev => prev.map(c => {
+            if (selectedIds.has(c.id) || c.id === id) {
+                const node = shapeRefs.current[c.id];
+                if (node) return { ...c, x: node.x(), y: node.y() };
+            }
+            return c;
+        }));
+        setRects(prev => prev.map(r => {
+            if (selectedIds.has(r.id) || r.id === id) {
+                const node = shapeRefs.current[r.id];
+                if (node) return { ...r, x: node.x(), y: node.y() };
+            }
+            return r;
+        }));
+        setTexts(prev => prev.map(t => {
+            if (selectedIds.has(t.id) || t.id === id) {
+                const node = shapeRefs.current[t.id];
+                if (node) return { ...t, x: node.x(), y: node.y() };
+            }
+            return t;
+        }));
+        setLines(prev => prev.map(l => {
+            if (selectedIds.has(l.id) || l.id === id) {
+                const node = shapeRefs.current[l.id];
+                if (node) return { ...l, x: node.x(), y: node.y() };
+            }
+            return l;
+        }));
+    };
+
+    const getSurfacePoint = (c1: CircleData, c2: CircleData) => {
+        const dx = c2.x - c1.x;
+        const dy = c2.y - c1.y;
+        const angle = Math.atan2(dy, dx);
+
+        const startX = c1.x + c1.radius * Math.cos(angle);
+        const startY = c1.y + c1.radius * Math.sin(angle);
+
+        const endX = c2.x - c2.radius * Math.cos(angle);
+        const endY = c2.y - c2.radius * Math.sin(angle);
+
+        return { startX, startY, endX, endY };
+    };
+
+    const handleClick = (id: string, e: any) => {
+        e.cancelBubble = true;
+        if (editingId) return;
+
+        // Handle Text Edit on Double Click or specific interaction?
+        // User said "Standalone text tool", but didn't specify editing existing text.
+        // Assuming behaves like rect: e.g. 'c' key or double click?
+        // Or maybe just let 'c' work for text too? 
+        // Let's make 'c' work for selected text (user asked for 'c' on rect, but probably expects editing text to work similarly).
+        // Or maybe double click is better UX, but let's stick to consistent key commands or added clicking logic.
+        // For now, if I click a text object, just select it.
+        // If I want to edit it, I might implementation 'c' key for it too or double click.
+        // I'll add 'c' key support for TextData in handleKeyDown.
+
+        if (mode === 'line' || mode === 'arrow') {
+            const circle = circles.find(c => c.id === id);
+            if (!circle) return;
+
+            if (tempLineStartId === null) {
+                setTempLineStartId(id);
+            } else {
+                if (tempLineStartId === id) {
+                    setTempLineStartId(null);
+                    return;
+                }
+
+                const startCircle = circles.find(c => c.id === tempLineStartId);
+                if (startCircle) {
+                    saveHistory();
+
+                    const { startX, startY, endX, endY } = getSurfacePoint(startCircle, circle);
+
+                    const newLine: LineData = {
+                        id: `line-${Date.now()}`,
+                        x: 0,
+                        y: 0,
+                        points: [startX, startY, endX, endY],
+                        stroke: 'black',
+                        strokeWidth: 2,
+                        type: mode as 'line' | 'arrow'
+                    };
+                    setLines(prev => [...prev, newLine]);
+                }
+                setTempLineStartId(null);
+            }
+            return;
+        }
+
+        const metaPressed = e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey;
+        const isSelected = selectedIds.has(id);
+
+        if (!metaPressed) {
+            if (!isSelected) {
+                setSelectedIds(new Set([id]));
+            }
+        } else {
+            const newSelected = new Set(selectedIds);
+            if (isSelected) {
+                newSelected.delete(id);
+            } else {
+                newSelected.add(id);
+            }
+            setSelectedIds(newSelected);
+        }
+    };
+
+    // Add 'c' key support for editing existing Text Objects
+    // Update handleKeyDown logic for 'c' key... (Done below inside the component update)
+
+    if (size.width === 0) {
+        return <div>Loading Whiteboard...</div>;
+    }
+
+    let modeText = '👆 Select';
+    let modeHint = '(Undo: Ctrl+Z, Space to Pan)';
+    if (mode === 'line') {
+        modeText = '📏 Line';
+        modeHint = tempLineStartId ? 'Select second circle' : 'Drag to draw line / Select circle';
+    } else if (mode === 'arrow') {
+        modeText = '🏹 Arrow';
+        modeHint = tempLineStartId ? 'Select second circle' : 'Drag to draw arrow / Select circle';
+    } else if (mode === 'text') {
+        modeText = '📝 Text';
+        modeHint = 'Click anywhere to type';
+    }
+
+    const currentEditingRect = editingId ? rects.find(r => r.id === editingId) : null;
+    const currentEditingText = editingId ? texts.find(t => t.id === editingId) : null;
+
+    // Combine edit handling
+    const isEditingRect = !!currentEditingRect;
+    const editingValue = isEditingRect ? currentEditingRect?.text : currentEditingText?.text;
+
+    return (
+        <>
+            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-white px-4 py-2 rounded shadow border z-10 flex flex-col items-center select-none pointer-events-none">
+                <div className="pointer-events-auto">
+                    Current Mode: <span className="font-bold">{modeText}</span>
+                </div>
+                <div className="text-xs text-gray-400 mt-1">
+                    {isPanning ? '🖐 Panning...' : modeHint}
+                </div>
+            </div>
+
+            {/* Inline Text Area */}
+            {editingId && editPos && (currentEditingRect || currentEditingText) && (
+                <textarea
+                    ref={textareaRef}
+                    value={editingValue || ""}
+                    onChange={(e) => {
+                        const val = e.target.value;
+                        if (isEditingRect) {
+                            setRects(prev => prev.map(r => r.id === editingId ? { ...r, text: val } : r));
+                        } else {
+                            setTexts(prev => prev.map(t => t.id === editingId ? { ...t, text: val } : t));
+                        }
+                    }}
+                    onBlur={() => {
+                        // If text object is empty on blur, maybe delete it?
+                        // Keeping it simple for now.
+                        setEditingId(null);
+                    }}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            setEditingId(null);
+                        }
+                    }}
+                    style={{
+                        position: 'absolute',
+                        left: editPos.x,
+                        top: editPos.y,
+                        width: isEditingRect ? editPos.w : 'auto',
+                        height: isEditingRect ? editPos.h : 'auto',
+                        minWidth: isEditingRect ? undefined : '200px', // Min width for text tool
+                        fontSize: isEditingRect ? 18 : (currentEditingText?.fontSize || 20),
+                        textAlign: isEditingRect ? 'center' : 'left',
+                        border: '1px solid #3b82f6',
+                        outline: 'none',
+                        background: 'transparent',
+                        resize: 'none',
+                        overflow: 'hidden',
+                        zIndex: 20,
+                        padding: 0,
+                        paddingTop: isEditingRect ? Math.max(0, (editPos.h - (editingValue?.split('\n').length || 1) * 22) / 2) : 0,
+                        lineHeight: '22px',
+                        fontFamily: 'Arial, sans-serif',
+                        color: isEditingRect ? 'black' : (currentEditingText?.fill || 'black')
+                    }}
+                />
+            )}
+
+            <Stage
+                width={size.width}
+                height={size.height}
+                ref={stageRef}
+                draggable={isPanning}
+                className={`bg-white touch-none ${isPanning ? 'cursor-grab active:cursor-grabbing' : (mode === 'text' ? 'cursor-text' : (mode !== 'select' ? 'cursor-crosshair' : 'cursor-default'))}`}
+                onMouseDown={onMouseDown}
+                onMouseMove={onMouseMove}
+                onMouseUp={onMouseUp}
+                onTouchStart={onMouseDown}
+                onTouchMove={onMouseMove}
+                onTouchEnd={onMouseUp}
+            >
+                <Layer>
+                    {/* Rects */}
+                    {rects.map((rect) => {
+                        const isSelected = selectedIds.has(rect.id);
+                        const isEditing = editingId === rect.id;
+
+                        return (
+                            <Group
+                                key={rect.id}
+                                ref={(node) => {
+                                    if (node) shapeRefs.current[rect.id] = node;
+                                    else delete shapeRefs.current[rect.id];
+                                }}
+                                x={rect.x}
+                                y={rect.y}
+                                draggable={mode === 'select' && !isPanning && !isEditing}
+                                onClick={(e) => {
+                                    if (!isPanning) handleClick(rect.id, e)
+                                }}
+                                onDragStart={(e) => handleDragStart(rect.id, e)}
+                                onDragMove={(e) => handleDragMove(rect.id, e)}
+                                onDragEnd={(e) => handleDragEnd(rect.id, e)}
+                            >
+                                <Rect
+                                    width={rect.width}
+                                    height={rect.height}
+                                    stroke={isSelected ? "#3b82f6" : (rect.stroke || "black")}
+                                    strokeWidth={isSelected ? 4 : 2}
+                                />
+                                {!isEditing && (
+                                    <Text
+                                        text={rect.text || ""}
+                                        fontSize={18}
+                                        fill="black"
+                                        width={rect.width}
+                                        height={rect.height}
+                                        align="center"
+                                        verticalAlign="middle"
+                                        listening={false}
+                                        lineHeight={1.2}
+                                    />
+                                )}
+                            </Group>
+                        );
+                    })}
+
+                    {/* Standalone Texts */}
+                    {texts.map((textItem) => {
+                        const isSelected = selectedIds.has(textItem.id);
+                        const isEditing = editingId === textItem.id;
+
+                        return (
+                            <Group
+                                key={textItem.id}
+                                ref={(node) => {
+                                    if (node) shapeRefs.current[textItem.id] = node;
+                                    else delete shapeRefs.current[textItem.id];
+                                }}
+                                x={textItem.x}
+                                y={textItem.y}
+                                draggable={mode === 'select' && !isPanning && !isEditing}
+                                onClick={(e) => {
+                                    if (!isPanning) handleClick(textItem.id, e)
+                                }}
+                                onDragStart={(e) => handleDragStart(textItem.id, e)}
+                                onDragMove={(e) => handleDragMove(textItem.id, e)}
+                                onDragEnd={(e) => handleDragEnd(textItem.id, e)}
+                            >
+                                {!isEditing && (
+                                    <>
+                                        {/* Selection Border (Invisible unless selected) */}
+                                        {isSelected && (
+                                            <Rect
+                                                width={shapeRefs.current[textItem.id]?.width() || 0}
+                                                height={shapeRefs.current[textItem.id]?.height() || 0}
+                                                stroke="#3b82f6"
+                                                strokeWidth={1}
+                                                dash={[5, 5]}
+                                            />
+                                        )}
+                                        <Text
+                                            text={textItem.text || "Type..."}
+                                            fontSize={textItem.fontSize}
+                                            fill={textItem.fill}
+                                            align="left"
+                                            lineHeight={1.2}
+                                        />
+                                    </>
+                                )}
+                            </Group>
+                        )
+                    })}
+
+                    {lines.map((line) => {
+                        const isSelected = selectedIds.has(line.id);
+                        const props = {
+                            ref: (node: any) => {
+                                if (node) shapeRefs.current[line.id] = node;
+                                else delete shapeRefs.current[line.id];
+                            },
+                            x: line.x,
+                            y: line.y,
+                            points: line.points,
+                            stroke: isSelected ? "#3b82f6" : line.stroke,
+                            strokeWidth: isSelected ? 4 : line.strokeWidth,
+                            hitStrokeWidth: 10,
+                            tension: 0,
+                            draggable: mode === 'select' && !isPanning,
+                            onClick: (e: any) => {
+                                if (mode === 'select' && !isPanning) handleClick(line.id, e);
+                            },
+                            onDragStart: (e: any) => handleDragStart(line.id, e),
+                            onDragMove: (e: any) => handleDragMove(line.id, e),
+                            onDragEnd: (e: any) => handleDragEnd(line.id, e)
+                        };
+
+                        if (line.type === 'arrow') {
+                            return <Arrow key={line.id} {...props} pointerLength={10} pointerWidth={10} fill={isSelected ? "#3b82f6" : (line.stroke || "black")} />;
+                        } else {
+                            return <Line key={line.id} {...props} />;
+                        }
+                    })}
+
+                    {/* Drawing Line Preview */}
+                    {drawingLine && (
+                        mode === 'arrow' ? (
+                            <Arrow
+                                points={[drawingLine.startX, drawingLine.startY, drawingLine.endX, drawingLine.endY]}
+                                stroke="black"
+                                strokeWidth={2}
+                                pointerLength={10}
+                                pointerWidth={10}
+                                fill="black"
+                            />
+                        ) : (
+                            <Line
+                                points={[drawingLine.startX, drawingLine.startY, drawingLine.endX, drawingLine.endY]}
+                                stroke="black"
+                                strokeWidth={2}
+                            />
+                        )
+                    )}
+
+                    {circles.map((circle) => {
+                        const isSelected = selectedIds.has(circle.id);
+                        const isConnectStart = circle.id === tempLineStartId;
+                        return (
+                            <Group
+                                key={circle.id}
+                                ref={(node) => {
+                                    if (node) shapeRefs.current[circle.id] = node;
+                                    else delete shapeRefs.current[circle.id];
+                                }}
+                                x={circle.x}
+                                y={circle.y}
+                                draggable={mode === 'select' && !isPanning}
+                                onClick={(e) => {
+                                    if (!isPanning) handleClick(circle.id, e)
+                                }}
+                                onDragStart={(e) => handleDragStart(circle.id, e)}
+                                onDragMove={(e) => handleDragMove(circle.id, e)}
+                                onDragEnd={(e) => handleDragEnd(circle.id, e)}
+                            >
+                                <Circle
+                                    radius={circle.radius}
+                                    stroke={isSelected || isConnectStart ? "#3b82f6" : (circle.stroke || "black")}
+                                    strokeWidth={isSelected || isConnectStart ? 4 : 2}
+                                    fill={isConnectStart ? "rgba(59, 130, 246, 0.1)" : undefined}
+                                />
+                                <Text
+                                    text={circle.text}
+                                    fontSize={21}
+                                    fill="black"
+                                    align="center"
+                                    verticalAlign="middle"
+                                    offsetX={15}
+                                    offsetY={10.5}
+                                    width={30}
+                                    height={21}
+                                    listening={false}
+                                />
+                            </Group>
+                        );
+                    })}
+
+                    {selection && selection.isSelecting && !isPanning && (
+                        <Rect
+                            x={selection.x}
+                            y={selection.y}
+                            width={selection.width}
+                            height={selection.height}
+                            fill="rgba(59, 130, 246, 0.2)"
+                            stroke="#3b82f6"
+                            listening={false}
+                        />
+                    )}
+                </Layer>
+            </Stage>
+        </>
+    );
+};
+
+export default Whiteboard;

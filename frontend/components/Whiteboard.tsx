@@ -333,7 +333,8 @@ const Whiteboard = () => {
             circles: structuredClone(circles),
             lines: structuredClone(lines),
             rects: structuredClone(rects),
-            texts: structuredClone(texts)
+            texts: structuredClone(texts),
+            images: structuredClone(images)
         }]);
     };
 

@@ -40,12 +40,12 @@ const CircleShape = ({
             radius={circle.radius}
             stroke={isSelected || isConnectStart ? '#3b82f6' : (circle.stroke || 'black')}
             strokeWidth={isSelected || isConnectStart ? 4 : 2}
-            fill={isConnectStart ? 'rgba(59, 130, 246, 0.1)' : undefined}
+            fill={isConnectStart ? 'rgba(59, 130, 246, 0.1)' : (circle.fill || 'transparent')}
         />
         <Text
             text={circle.text}
             fontSize={CIRCLE_TEXT_FONT_SIZE}
-            fill="black"
+            fill={circle.textFill || 'black'}
             align="center"
             verticalAlign="middle"
             offsetX={CIRCLE_TEXT_OFFSET_X}

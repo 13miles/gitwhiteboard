@@ -5,6 +5,8 @@ export interface CircleData {
     radius: number;
     text: string;
     stroke?: string;
+    fill?: string;
+    textFill?: string;
 }
 
 export interface RectData {
@@ -15,6 +17,8 @@ export interface RectData {
     height: number;
     text?: string;
     stroke?: string;
+    fill?: string;
+    textFill?: string;
 }
 
 export interface ImageData {

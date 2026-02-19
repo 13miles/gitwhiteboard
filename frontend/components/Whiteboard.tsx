@@ -230,13 +230,22 @@ const Whiteboard = () => {
 
             // Color shortcuts (1-6)
             if (['1', '2', '3', '4', '5', '6'].includes(e.key) && s.selectedIds.size > 0) {
-                const colorMap: Record<string, string> = { '1': 'black', '2': 'red', '3': '#1d4ed8', '4': '#15803d', '5': 'gray', '6': 'white' };
-                const newColor = colorMap[e.key];
+                const colorMap: Record<string, { stroke: string; fill?: string; textFill?: string }> = {
+                    '1': { stroke: 'black', fill: 'transparent', textFill: 'black' },
+                    '2': { stroke: 'red', fill: 'red', textFill: 'white' },
+                    '3': { stroke: '#1d4ed8', fill: '#1d4ed8', textFill: 'white' },
+                    '4': { stroke: '#15803d', fill: '#15803d', textFill: 'white' },
+                    '5': { stroke: 'gray', fill: 'gray', textFill: 'white' },
+                    '6': { stroke: 'white', fill: 'transparent', textFill: 'black' },
+                };
+
+                const style = colorMap[e.key];
+
                 saveHistory();
-                setCircles(prev => prev.map(c => s.selectedIds.has(c.id) ? { ...c, stroke: newColor } : c));
-                setRects(prev => prev.map(r => s.selectedIds.has(r.id) ? { ...r, stroke: newColor } : r));
-                setLines(prev => prev.map(l => s.selectedIds.has(l.id) ? { ...l, stroke: newColor } : l));
-                setTexts(prev => prev.map(t => s.selectedIds.has(t.id) ? { ...t, fill: newColor } : t));
+                setCircles(prev => prev.map(c => s.selectedIds.has(c.id) ? { ...c, ...style } : c));
+                setRects(prev => prev.map(r => s.selectedIds.has(r.id) ? { ...r, ...style } : r));
+                setLines(prev => prev.map(l => s.selectedIds.has(l.id) ? { ...l, stroke: style.stroke } : l));
+                setTexts(prev => prev.map(t => s.selectedIds.has(t.id) ? { ...t, fill: style.textFill || style.stroke } : t));
                 return;
             }
 

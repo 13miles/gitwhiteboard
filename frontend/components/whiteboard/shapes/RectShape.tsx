@@ -41,12 +41,13 @@ const RectShape = ({
             height={rect.height}
             stroke={isSelected ? '#3b82f6' : (rect.stroke || 'black')}
             strokeWidth={isSelected ? 4 : 2}
+            fill={rect.fill || 'transparent'}
         />
         {!isEditing && (
             <Text
                 text={rect.text || ''}
                 fontSize={RECT_TEXT_FONT_SIZE}
-                fill="black"
+                fill={rect.textFill || 'black'}
                 width={rect.width}
                 height={rect.height}
                 align="center"

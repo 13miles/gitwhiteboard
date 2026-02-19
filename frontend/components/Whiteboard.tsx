@@ -878,6 +878,8 @@ const Whiteboard = () => {
     const handleDragEnd = (id: string, e: any) => {
         if (mode !== 'select' || isPanning || editingId) return;
 
+        console.log('DragEnd', id, e.target.x(), e.target.y());
+
         // Synchronize state with Konva nodes
         const newSelectedIds = selectedIds.has(id) ? selectedIds : new Set([id]);
 
@@ -1158,6 +1160,8 @@ const Whiteboard = () => {
                                 onTransformEnd={handleTransformEnd}
                             >
                                 <Rect
+                                    x={0}
+                                    y={0}
                                     width={rect.width}
                                     height={rect.height}
                                     stroke={isSelected ? "#3b82f6" : (rect.stroke || "black")}
@@ -1300,6 +1304,8 @@ const Whiteboard = () => {
                                 onTransformEnd={handleTransformEnd}
                             >
                                 <Circle
+                                    x={0}
+                                    y={0}
                                     radius={circle.radius}
                                     stroke={isSelected || isConnectStart ? "#3b82f6" : (circle.stroke || "black")}
                                     strokeWidth={isSelected || isConnectStart ? 4 : 2}

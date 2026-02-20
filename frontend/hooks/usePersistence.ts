@@ -8,6 +8,7 @@ interface UsePersistenceOptions {
     rects: WhiteboardState['rects'];
     texts: WhiteboardState['texts'];
     images: WhiteboardState['images'];
+    terminals: WhiteboardState['terminals'];
     onApplyState: (partial: Partial<WhiteboardState>) => void;
     beforeLoad?: () => void;
 }
@@ -16,7 +17,7 @@ interface UsePersistenceOptions {
  * localStorage 저장/로드 및 파일 I/O 훅.
  */
 export function usePersistence({
-    circles, lines, rects, texts, images,
+    circles, lines, rects, texts, images, terminals,
     onApplyState, beforeLoad,
 }: UsePersistenceOptions) {
     const [isLoaded, setIsLoaded] = useState(false);
@@ -44,11 +45,11 @@ export function usePersistence({
     // 상태 변경 시 localStorage에 저장
     useEffect(() => {
         if (!isLoaded) return;
-        localStorage.setItem('whiteboard-data', JSON.stringify({ circles, lines, rects, texts, images }));
-    }, [circles, lines, rects, texts, images, isLoaded]);
+        localStorage.setItem('whiteboard-data', JSON.stringify({ circles, lines, rects, texts, images, terminals }));
+    }, [circles, lines, rects, texts, images, terminals, isLoaded]);
 
     const handleSave = useCallback(() => {
-        const data = { circles, lines, rects, texts, images };
+        const data = { circles, lines, rects, texts, images, terminals };
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -58,7 +59,7 @@ export function usePersistence({
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-    }, [circles, lines, rects, texts, images]);
+    }, [circles, lines, rects, texts, images, terminals]);
 
     const handleLoad = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];

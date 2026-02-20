@@ -27,7 +27,7 @@ const ShortcutHelp = () => {
                     <ul className="text-xs list-none space-y-1 text-gray-700">
                         <li><kbd className="font-mono bg-gray-100 px-1 rounded border">C</kbd> 원 생성 &nbsp;<kbd className="font-mono bg-gray-100 px-1 rounded border">R</kbd> 사각형 생성</li>
                         <li><kbd className="font-mono bg-gray-100 px-1 rounded border">RR/RRR</kbd> 큰 사각형 생성</li>
-                        <li><kbd className="font-mono bg-gray-100 px-1 rounded border">T</kbd> 텍스트 모드 &nbsp;<kbd className="font-mono bg-gray-100 px-1 rounded border">E</kbd> 편집 (원/사각형)</li>
+                        <li><kbd className="font-mono bg-gray-100 px-1 rounded border">T</kbd> 텍스트 모드 &nbsp;<kbd className="font-mono bg-gray-100 px-1 rounded border">I</kbd> 터미널 생성</li>
                         <li><kbd className="font-mono bg-gray-100 px-1 rounded border">L/LL</kbd> 선/화살표 모드</li>
                         <li><kbd className="font-mono bg-gray-100 px-1 rounded border">Space</kbd> 캔버스 이동(Pan)</li>
                         <li><kbd className="font-mono bg-gray-100 px-1 rounded border">D</kbd> / <kbd className="font-mono bg-gray-100 px-1 rounded border">Delete</kbd> 선택 삭제</li>

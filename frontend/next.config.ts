@@ -12,7 +12,7 @@ const commitHash = (() => {
 const nextConfig: NextConfig = {
   /* config options here */
   output: 'standalone',
-  reactCompiler: true,
+  reactCompiler: false,
   env: {
     NEXT_PUBLIC_COMMIT_HASH: commitHash,
   },

@@ -49,12 +49,21 @@ export interface TextData {
     fill: string;
 }
 
+export interface TerminalData {
+    id: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
 export interface WhiteboardState {
     circles: CircleData[];
     lines: LineData[];
     rects: RectData[];
     texts: TextData[];
     images: ImageData[];
+    terminals: TerminalData[];
 }
 
 export type WhiteboardMode = 'select' | 'line' | 'arrow' | 'text';

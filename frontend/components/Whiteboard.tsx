@@ -1,12 +1,14 @@
 'use client';
 
+import dynamic from 'next/dynamic';
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Stage, Layer, Transformer, Line as KonvaLine, Arrow } from 'react-konva';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { nanoid } from 'nanoid';
 
-import type { CircleData, LineData, RectData, TextData, ImageData, WhiteboardState, WhiteboardMode } from '@/types';
+import type { CircleData, LineData, RectData, TextData, ImageData, TerminalData, WhiteboardState, WhiteboardMode } from '@/types';
 import {
     DEFAULT_CIRCLE_RADIUS, DEFAULT_RECT_SIZE_SM, DEFAULT_RECT_SIZE_MD,
     DEFAULT_TEXT_FONT_SIZE, TEXT_EDIT_MIN_WIDTH, TEXT_EDIT_HEIGHT,
@@ -21,6 +23,10 @@ import RectShape from './whiteboard/shapes/RectShape';
 import LineShape from './whiteboard/shapes/LineShape';
 import TextShape from './whiteboard/shapes/TextShape';
 import ImageShape from './whiteboard/shapes/ImageShape';
+const TerminalShape = dynamic(
+    () => import('./whiteboard/shapes/TerminalShape'),
+    { ssr: false, loading: () => null }
+);
 import ModeIndicator from './whiteboard/toolbar/ModeIndicator';
 import SessionToolbar from './whiteboard/toolbar/SessionToolbar';
 
@@ -39,6 +45,7 @@ const Whiteboard = () => {
     const [rects, setRects] = useState<RectData[]>([]);
     const [texts, setTexts] = useState<TextData[]>([]);
     const [images, setImages] = useState<ImageData[]>([]);
+    const [terminals, setTerminals] = useState<TerminalData[]>([]);
 
     // ── UI state ─────────────────────────
     const [mode, setMode] = useState<WhiteboardMode>('select');
@@ -66,7 +73,7 @@ const Whiteboard = () => {
     const [size, setSize] = useState({ width: 0, height: 0 });
 
     // ── Hooks ─────────────────────────────
-    const { saveHistory, undo } = useHistory({ circles, lines, rects, texts, images });
+    const { saveHistory, undo } = useHistory({ circles, lines, rects, texts, images, terminals });
 
     const applyState = useCallback((state: Partial<WhiteboardState>) => {
         if (state.circles !== undefined) setCircles(state.circles);
@@ -74,17 +81,18 @@ const Whiteboard = () => {
         if (state.rects !== undefined) setRects(state.rects);
         if (state.texts !== undefined) setTexts(state.texts);
         if (state.images !== undefined) setImages(state.images);
+        if (state.terminals !== undefined) setTerminals(state.terminals);
     }, []);
 
     const handleClear = useCallback(() => {
         saveHistory();
-        setCircles([]); setLines([]); setRects([]); setTexts([]); setImages([]);
+        setCircles([]); setLines([]); setRects([]); setTexts([]); setImages([]); setTerminals([]);
         setSelectedIds(new Set());
         localStorage.removeItem('whiteboard-data');
     }, [saveHistory]);
 
     const { isLoaded, fileInputRef, handleSave, handleLoad } = usePersistence({
-        circles, lines, rects, texts, images,
+        circles, lines, rects, texts, images, terminals,
         onApplyState: applyState,
         beforeLoad: saveHistory,
     });
@@ -96,6 +104,7 @@ const Whiteboard = () => {
             setRects(lastState.rects || []);
             setTexts(lastState.texts || []);
             setImages(lastState.images || []);
+            setTerminals(lastState.terminals || []);
             setSelectedIds(new Set());
             setTempLineStartId(null);
             setEditingId(null);
@@ -120,7 +129,7 @@ const Whiteboard = () => {
         });
         trRef.current.nodes(nodes);
         trRef.current.getLayer()?.batchDraw();
-    }, [selectedIds, circles, lines, rects, texts, images]);
+    }, [selectedIds, circles, lines, rects, texts, images, terminals]);
 
     // ── Text textarea focus ───────────────
     useEffect(() => {
@@ -172,18 +181,19 @@ const Whiteboard = () => {
     // ── Keyboard handler ──────────────────
     // keyboardStateRef로 stale closure 방지 (의존성 배열 최소화)
     const keyboardStateRef = useRef({
-        mode, selectedIds, circles, lines, rects, texts, images,
+        mode, selectedIds, circles, lines, rects, texts, images, terminals,
         clipboard, isPanning, editingId, lastRPressTime, lastCPressTime,
     });
     useEffect(() => {
         keyboardStateRef.current = {
-            mode, selectedIds, circles, lines, rects, texts, images,
+            mode, selectedIds, circles, lines, rects, texts, images, terminals,
             clipboard, isPanning, editingId, lastRPressTime, lastCPressTime,
         };
     });
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            console.log('KeyDown:', e.key, 'Code:', e.code, 'Shift:', e.shiftKey, 'Mode:', keyboardStateRef.current.mode);
             const s = keyboardStateRef.current;
 
             if (s.editingId) {
@@ -206,7 +216,9 @@ const Whiteboard = () => {
                         lines: structuredClone(s.lines.filter(l => s.selectedIds.has(l.id))),
                         rects: structuredClone(s.rects.filter(r => s.selectedIds.has(r.id))),
                         texts: structuredClone(s.texts.filter(t => s.selectedIds.has(t.id))),
+
                         images: structuredClone(s.images.filter(i => s.selectedIds.has(i.id))),
+                        terminals: structuredClone(s.terminals.filter(t => s.selectedIds.has(t.id))),
                     });
                 }
                 return;
@@ -224,6 +236,7 @@ const Whiteboard = () => {
                     setRects(prev => [...prev, ...s.clipboard!.rects.map(r => ({ ...r, id: mk('rect'), x: r.x + offset, y: r.y + offset }))]);
                     setTexts(prev => [...prev, ...s.clipboard!.texts.map(t => ({ ...t, id: mk('text'), x: t.x + offset, y: t.y + offset }))]);
                     setImages(prev => [...prev, ...s.clipboard!.images.map(i => ({ ...i, id: mk('image'), x: i.x + offset, y: i.y + offset }))]);
+                    setTerminals(prev => [...prev, ...s.clipboard!.terminals.map(t => ({ ...t, id: mk('terminal'), x: t.x + offset, y: t.y + offset }))]);
                     setSelectedIds(newIds);
                 }
                 return;
@@ -319,7 +332,21 @@ const Whiteboard = () => {
                 setMode(prev => prev === 'select' ? 'line' : prev === 'line' ? 'arrow' : 'select');
                 setSelectedIds(new Set()); setTempLineStartId(null);
             }
-            if (e.key === 't' || e.key === 'T') {
+
+
+
+            // Terminal (I key)
+            if ((e.key === 'i' || e.key === 'I') && !s.editingId && !e.ctrlKey && !e.metaKey) {
+                saveHistory();
+                const { x, y } = getRelativePointerPosition();
+                setTerminals(prev => [...prev, {
+                    id: `terminal-${nanoid()}`,
+                    x: x || 100, y: y || 100,
+                    width: 580, height: 360,
+                }]);
+            }
+
+            if (e.code === 'KeyT' && !e.shiftKey) {
                 setMode(prev => prev === 'text' ? 'select' : 'text');
                 setSelectedIds(new Set()); setTempLineStartId(null);
             }
@@ -388,6 +415,7 @@ const Whiteboard = () => {
                         setRects(prev => prev.filter(r => !s.selectedIds.has(r.id)));
                         setTexts(prev => prev.filter(t => !s.selectedIds.has(t.id)));
                         setImages(prev => prev.filter(i => !s.selectedIds.has(i.id)));
+                        setTerminals(prev => prev.filter(t => !s.selectedIds.has(t.id)));
                         setSelectedIds(new Set());
                     }
                 }
@@ -405,6 +433,7 @@ const Whiteboard = () => {
                             setRects(prev => prev.map(r => s.selectedIds.has(r.id) ? { ...r, x: minX } : r));
                             setTexts(prev => prev.map(t => s.selectedIds.has(t.id) ? { ...t, x: minX } : t));
                             setImages(prev => prev.map(i => s.selectedIds.has(i.id) ? { ...i, x: minX } : i));
+                            setTerminals(prev => prev.map(t => s.selectedIds.has(t.id) ? { ...t, x: minX } : t));
                         }
                     }
                 }
@@ -440,6 +469,7 @@ const Whiteboard = () => {
                             setRects(prev => prev.map(r => s.selectedIds.has(r.id) ? { ...r, y: minY } : r));
                             setTexts(prev => prev.map(t => s.selectedIds.has(t.id) ? { ...t, y: minY } : t));
                             setImages(prev => prev.map(i => s.selectedIds.has(i.id) ? { ...i, y: minY } : i));
+                            setTerminals(prev => prev.map(t => s.selectedIds.has(t.id) ? { ...t, y: minY } : t));
                         }
                     }
                 }
@@ -468,11 +498,11 @@ const Whiteboard = () => {
             if (e.key === ' ') setIsPanning(false);
         };
 
-        window.addEventListener('keydown', handleKeyDown);
-        window.addEventListener('keyup', handleKeyUp);
+        document.addEventListener('keydown', handleKeyDown);
+        document.addEventListener('keyup', handleKeyUp);
         return () => {
-            window.removeEventListener('keydown', handleKeyDown);
-            window.removeEventListener('keyup', handleKeyUp);
+            document.removeEventListener('keydown', handleKeyDown);
+            document.removeEventListener('keyup', handleKeyUp);
         };
     }, [handleUndo, saveHistory]); // stateRef로 접근하므로 최소 의존성
 
@@ -527,6 +557,8 @@ const Whiteboard = () => {
                 setTexts(prev => prev.map(t => t.id === id ? { ...t, x: node.x(), y: node.y(), fontSize: Math.max(12, t.fontSize * sy) } : t));
             else if (id.startsWith('image'))
                 setImages(prev => prev.map(i => i.id === id ? { ...i, x: node.x(), y: node.y(), width: Math.max(5, i.width * sx), height: Math.max(5, i.height * sy) } : i));
+            else if (id.startsWith('terminal'))
+                setTerminals(prev => prev.map(t => t.id === id ? { ...t, x: node.x(), y: node.y(), width: Math.max(100, t.width * sx), height: Math.max(100, t.height * sy) } : t));
         });
     };
 
@@ -586,6 +618,7 @@ const Whiteboard = () => {
         setRects(prev => sync(prev, r => r.id));
         setTexts(prev => sync(prev, t => t.id));
         setImages(prev => sync(prev, i => i.id));
+        setTerminals(prev => sync(prev, t => t.id));
 
         // Clear drag ref (optional, but good for cleanup)
         dragSelectedIdsRef.current = new Set();
@@ -708,6 +741,7 @@ const Whiteboard = () => {
         circles.forEach(c => { if (hits(c.x - c.radius, c.y - c.radius, c.x + c.radius, c.y + c.radius)) newSelected.add(c.id); });
         rects.forEach(r => { if (hits(r.x, r.y, r.x + r.width, r.y + r.height)) newSelected.add(r.id); });
         images.forEach(i => { if (hits(i.x, i.y, i.x + i.width, i.y + i.height)) newSelected.add(i.id); });
+        terminals.forEach(t => { if (hits(t.x, t.y, t.x + t.width, t.y + t.height)) newSelected.add(t.id); });
         texts.forEach(t => {
             const node = shapeRefs.current[t.id];
             const w = node ? node.width() * node.scaleX() : 100;
@@ -880,6 +914,16 @@ const Whiteboard = () => {
                             onDragMove={e => handleDragMove(image.id, e)}
                             onDragEnd={() => handleDragEnd(image.id)}
                             onTransformEnd={handleTransformEnd}
+                        />
+                    ))}
+
+                    {terminals.map(term => (
+                        <TerminalShape
+                            key={term.id}
+                            terminal={term}
+                            isSelected={selectedIds.has(term.id)}
+                            onTransformEnd={handleTransformEnd}
+                            mode={mode}
                         />
                     ))}
 

@@ -13,13 +13,17 @@ interface TerminalShapeProps {
     isSelected: boolean;
     onTransformEnd: () => void;
     mode: string;
+    isPanning?: boolean;
     shapeRef?: (node: Konva.Group | null) => void;
     onClick?: (e: KonvaEventObject<MouseEvent>) => void;
+    onDragStart?: (e: KonvaEventObject<DragEvent>) => void;
+    onDragMove?: (e: KonvaEventObject<DragEvent>) => void;
+    onDragEnd?: (e: KonvaEventObject<DragEvent>) => void;
     onClose?: () => void;
     onToggleSelect?: () => void;
 }
 
-const TerminalShape: React.FC<TerminalShapeProps> = ({ terminal, isSelected, onTransformEnd, mode, shapeRef, onClick, onClose, onToggleSelect }) => {
+const TerminalShape: React.FC<TerminalShapeProps> = ({ terminal, isSelected, onTransformEnd, mode, isPanning, shapeRef, onClick, onDragStart, onDragMove, onDragEnd, onClose, onToggleSelect }) => {
     // div가 실제로 DOM에 붙었을 때 state로 추적
     const [terminalEl, setTerminalEl] = useState<HTMLDivElement | null>(null);
     const xtermRef = useRef<Terminal | null>(null);
@@ -107,6 +111,16 @@ const TerminalShape: React.FC<TerminalShapeProps> = ({ terminal, isSelected, onT
             }
         });
 
+        term.attachCustomKeyEventHandler((e) => {
+            // Escape 키 누르면 터미널 포커스 해제 (이후 단축키 동작 가능)
+            if (e.key === 'Escape' && e.type === 'keydown') {
+                term.blur();
+                document.body.focus();
+                return false;
+            }
+            return true;
+        });
+
         // Handle resize
         const resizeObserver = new ResizeObserver(() => {
             // Safety check: only fit if terminal element is attached and has size
@@ -129,18 +143,20 @@ const TerminalShape: React.FC<TerminalShapeProps> = ({ terminal, isSelected, onT
 
         return () => {
             resizeObserver.disconnect();
-            ws.close();
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.close();
+            }
             term.dispose();
             xtermRef.current = null;
         };
     }, [terminalEl]);
 
     // 선택 시 xterm 포커스
-    useEffect(() => {
-        if (isSelected && xtermRef.current) {
-            setTimeout(() => xtermRef.current?.focus(), 50);
-        }
-    }, [isSelected]);
+    // useEffect(() => {
+    //     if (isSelected && xtermRef.current) {
+    //         setTimeout(() => xtermRef.current?.focus(), 50);
+    //     }
+    // }, [isSelected]);
 
     // Re-fit when size changes via props
     useEffect(() => {
@@ -166,8 +182,11 @@ const TerminalShape: React.FC<TerminalShapeProps> = ({ terminal, isSelected, onT
             y={terminal.y}
             width={terminal.width}
             height={terminal.height}
-            draggable={mode === 'select'}
-            onDragEnd={onTransformEnd}
+            draggable={mode === 'select' && !isPanning}
+            onDragStart={onDragStart}
+            onDragMove={onDragMove}
+            onDragEnd={onDragEnd}
+            onTransformEnd={onTransformEnd}
             ref={shapeRef}
             onClick={onClick}
         >

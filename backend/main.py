@@ -77,9 +77,9 @@ async def websocket_terminal(websocket: WebSocket):
 
                 os.write(master_fd, data.encode())
         except WebSocketDisconnect:
-            pass
-        except Exception:
-            pass
+            print("WebSocket Disconnected")
+        except Exception as e:
+            print(f"WS Exception: {e}")
 
     read_task = None
     write_task = None
@@ -95,5 +95,5 @@ async def websocket_terminal(websocket: WebSocket):
         except OSError:
             pass
         if p.poll() is None:
-            p.terminate()
+            p.kill()
             p.wait()

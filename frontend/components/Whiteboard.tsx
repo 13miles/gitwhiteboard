@@ -941,8 +941,12 @@ const Whiteboard = () => {
                             isSelected={selectedIds.has(term.id)}
                             onTransformEnd={handleTransformEnd}
                             mode={mode}
+                            isPanning={isPanning}
                             shapeRef={node => { if (node) shapeRefs.current[term.id] = node; else delete shapeRefs.current[term.id]; }}
                             onClick={e => { if (!isPanning) handleClick(term.id, e); }}
+                            onDragStart={e => handleDragStart(term.id, e)}
+                            onDragMove={e => handleDragMove(term.id, e)}
+                            onDragEnd={() => handleDragEnd(term.id)}
                             onClose={() => removeTerminal(term.id)}
                             onToggleSelect={() => handleClick(term.id, { evt: { shiftKey: true } } as any)}
                         />

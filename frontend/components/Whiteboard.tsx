@@ -339,11 +339,14 @@ const Whiteboard = () => {
             if ((e.key === 'i' || e.key === 'I') && !s.editingId && !e.ctrlKey && !e.metaKey) {
                 saveHistory();
                 const { x, y } = getRelativePointerPosition();
+                const newId = `terminal-${nanoid()}`;
                 setTerminals(prev => [...prev, {
-                    id: `terminal-${nanoid()}`,
+                    id: newId,
                     x: x || 100, y: y || 100,
                     width: 580, height: 360,
                 }]);
+                // 생성 즉시 선택 → pointerEvents 활성화
+                setSelectedIds(new Set([newId]));
             }
 
             if (e.code === 'KeyT' && !e.shiftKey) {
@@ -924,6 +927,8 @@ const Whiteboard = () => {
                             isSelected={selectedIds.has(term.id)}
                             onTransformEnd={handleTransformEnd}
                             mode={mode}
+                            shapeRef={node => { if (node) shapeRefs.current[term.id] = node; else delete shapeRefs.current[term.id]; }}
+                            onClick={e => { if (!isPanning) handleClick(term.id, e); }}
                         />
                     ))}
 

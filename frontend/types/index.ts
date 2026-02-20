@@ -55,6 +55,7 @@ export interface TerminalData {
     y: number;
     width: number;
     height: number;
+    fontSize?: number;
 }
 
 export interface WhiteboardState {

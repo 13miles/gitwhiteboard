@@ -49,7 +49,7 @@ const TerminalShape: React.FC<TerminalShapeProps> = ({ terminal, isSelected, onT
                 background: '#1e1e1e',
             },
             fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-            fontSize: 22,
+            fontSize: terminal.fontSize || 22,
             scrollback: 5000,
         });
 
@@ -85,7 +85,7 @@ const TerminalShape: React.FC<TerminalShapeProps> = ({ terminal, isSelected, onT
                 if (rows > 0 && cols > 0) {
                     ws.send(`\x01Resize:${rows}:${cols}`);
                 }
-            } catch (_) { }
+            } catch { }
         };
 
         ws.onmessage = (event) => {
@@ -101,7 +101,7 @@ const TerminalShape: React.FC<TerminalShapeProps> = ({ terminal, isSelected, onT
             }
         };
 
-        ws.onerror = (err) => {
+        ws.onerror = () => {
             term.write('\r\n\x1b[31mWebSocket error. Is backend running?\x1b[0m\r\n');
         };
 
@@ -134,12 +134,12 @@ const TerminalShape: React.FC<TerminalShapeProps> = ({ terminal, isSelected, onT
                     if (ws.readyState === WebSocket.OPEN && rows > 0 && cols > 0) {
                         ws.send(`\x01Resize:${rows}:${cols}`);
                     }
-                } catch (_) { }
+                } catch { }
             });
         });
 
         resizeObserver.observe(terminalEl);
-        setIsLoaded(true);
+        setTimeout(() => setIsLoaded(true), 0);
 
         return () => {
             resizeObserver.disconnect();
@@ -149,7 +149,7 @@ const TerminalShape: React.FC<TerminalShapeProps> = ({ terminal, isSelected, onT
             term.dispose();
             xtermRef.current = null;
         };
-    }, [terminalEl]);
+    }, [terminalEl, onClose, terminal.fontSize]);
 
     // 선택 시 xterm 포커스
     // useEffect(() => {
@@ -170,10 +170,27 @@ const TerminalShape: React.FC<TerminalShapeProps> = ({ terminal, isSelected, onT
                     if (wsRef.current?.readyState === WebSocket.OPEN && rows > 0 && cols > 0) {
                         wsRef.current?.send(`\x01Resize:${rows}:${cols}`);
                     }
-                } catch (_) { }
+                } catch { }
             }, 100);
         }
     }, [terminal.width, terminal.height, isLoaded]);
+
+    // Update xterm options when font size changes
+    useEffect(() => {
+        if (isLoaded && xtermRef.current && terminal.fontSize) {
+            xtermRef.current.options.fontSize = terminal.fontSize;
+            setTimeout(() => {
+                try {
+                    fitAddonRef.current?.fit();
+                    const rows = xtermRef.current?.rows ?? 0;
+                    const cols = xtermRef.current?.cols ?? 0;
+                    if (wsRef.current?.readyState === WebSocket.OPEN && rows > 0 && cols > 0) {
+                        wsRef.current?.send(`\x01Resize:${rows}:${cols}`);
+                    }
+                } catch { }
+            }, 50);
+        }
+    }, [terminal.fontSize, isLoaded]);
 
     return (
         <Group

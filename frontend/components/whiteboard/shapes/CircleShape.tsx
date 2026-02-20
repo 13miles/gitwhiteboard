@@ -3,7 +3,7 @@ import { Group, Circle, Text } from 'react-konva';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { CircleData, WhiteboardMode } from '@/types';
-import { CIRCLE_TEXT_FONT_SIZE, CIRCLE_TEXT_WIDTH, CIRCLE_TEXT_HEIGHT, CIRCLE_TEXT_OFFSET_X, CIRCLE_TEXT_OFFSET_Y } from '@/constants/shapes';
+import { CIRCLE_TEXT_FONT_SIZE } from '@/constants/shapes';
 
 interface CircleShapeProps {
     circle: CircleData;

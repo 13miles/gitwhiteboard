@@ -39,7 +39,7 @@ export function usePersistence({
                 console.error('Failed to load whiteboard data', e);
             }
         }
-        setIsLoaded(true);
+        setTimeout(() => setIsLoaded(true), 0);
     }, []);
 
     // 상태 변경 시 localStorage에 저장

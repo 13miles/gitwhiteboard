@@ -91,7 +91,7 @@ const Whiteboard = () => {
         localStorage.removeItem('whiteboard-data');
     }, [saveHistory]);
 
-    const { isLoaded, fileInputRef, handleSave, handleLoad } = usePersistence({
+    const { fileInputRef, handleSave, handleLoad } = usePersistence({
         circles, lines, rects, texts, images, terminals,
         onApplyState: applyState,
         beforeLoad: saveHistory,
@@ -113,7 +113,7 @@ const Whiteboard = () => {
 
     // ── Window size ───────────────────────
     useEffect(() => {
-        setSize({ width: window.innerWidth, height: window.innerHeight });
+        setTimeout(() => setSize({ width: window.innerWidth, height: window.innerHeight }), 0);
         const handleResize = () => setSize({ width: window.innerWidth, height: window.innerHeight });
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
@@ -177,6 +177,17 @@ const Whiteboard = () => {
         window.addEventListener('paste', handlePaste);
         return () => window.removeEventListener('paste', handlePaste);
     }, [saveHistory]);
+
+    // ── Helpers ───────────────────────────
+    const getRelativePointerPosition = () => {
+        const stage = stageRef.current;
+        if (!stage) return { x: 0, y: 0 };
+        const pointer = stage.getPointerPosition();
+        if (!pointer) return { x: 0, y: 0 };
+        const scale = stage.scaleX();
+        const pos = stage.position();
+        return { x: (pointer.x - pos.x) / scale, y: (pointer.y - pos.y) / scale };
+    };
 
     // ── Keyboard handler ──────────────────
     // keyboardStateRef로 stale closure 방지 (의존성 배열 최소화)
@@ -282,6 +293,19 @@ const Whiteboard = () => {
                 return;
             }
 
+            // Terminal Font Resize ([ and ])
+            if ((e.key === '[' || e.key === ']') && s.selectedIds.size > 0) {
+                const isTerminalSelected = Array.from(s.selectedIds).some(id => id.startsWith('terminal'));
+                if (isTerminalSelected) {
+                    saveHistory();
+                    const delta = e.key === '[' ? -1 : 1;
+                    setTerminals(prev => prev.map(t =>
+                        s.selectedIds.has(t.id) ? { ...t, fontSize: Math.max(8, Math.min(72, (t.fontSize || 22) + delta)) } : t
+                    ));
+                    return;
+                }
+            }
+
             // Edit mode (E key)
             if ((e.key === 'e' || e.key === 'E') && s.selectedIds.size === 1) {
                 const id = Array.from(s.selectedIds)[0];
@@ -290,8 +314,6 @@ const Whiteboard = () => {
 
                 if (node && stage) {
                     // Calculate position
-                    const scale = stage.scaleX();
-                    const pos = stage.absolutePosition();
                     const nodePos = node.absolutePosition();
 
                     const rect = s.rects.find(r => r.id === id);
@@ -510,16 +532,6 @@ const Whiteboard = () => {
     }, [handleUndo, saveHistory]); // stateRef로 접근하므로 최소 의존성
 
     // ── Helpers ───────────────────────────
-    const getRelativePointerPosition = () => {
-        const stage = stageRef.current;
-        if (!stage) return { x: 0, y: 0 };
-        const pointer = stage.getPointerPosition();
-        if (!pointer) return { x: 0, y: 0 };
-        const scale = stage.scaleX();
-        const pos = stage.position();
-        return { x: (pointer.x - pos.x) / scale, y: (pointer.y - pos.y) / scale };
-    };
-
     const getSurfacePoint = (c1: CircleData, c2: CircleData) => {
         const angle = Math.atan2(c2.y - c1.y, c2.x - c1.x);
         return {
@@ -566,7 +578,7 @@ const Whiteboard = () => {
     };
 
     // ── Drag handlers ─────────────────────
-    const handleDragStart = (id: string, e: KonvaEventObject<DragEvent>) => {
+    const handleDragStart = (id: string) => {
         if (mode !== 'select' || isPanning || editingId) return;
         saveHistory();
 
@@ -600,7 +612,7 @@ const Whiteboard = () => {
         });
     };
 
-    const handleDragEnd = (id: string) => {
+    const handleDragEnd = () => {
         if (mode !== 'select' || isPanning || editingId) return;
 
         // dragSelectedIdsRef is already set from start, but we can sync state just in case
@@ -662,7 +674,8 @@ const Whiteboard = () => {
             if (!selectedIds.has(id)) setSelectedIds(new Set([id]));
         } else {
             const newSelected = new Set(selectedIds);
-            newSelected.has(id) ? newSelected.delete(id) : newSelected.add(id);
+            if (newSelected.has(id)) newSelected.delete(id);
+            else newSelected.add(id);
             setSelectedIds(newSelected);
         }
     };
@@ -702,7 +715,7 @@ const Whiteboard = () => {
         setSelection({ x, y, width: 0, height: 0, startX: x, startY: y, isSelecting: true });
     };
 
-    const onMouseMove = (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
+    const onMouseMove = () => {
         if (isPanning) return;
         if (drawingLine) {
             const { x, y } = getRelativePointerPosition();
@@ -852,9 +865,9 @@ const Whiteboard = () => {
                             isPanning={isPanning}
                             shapeRef={node => { if (node) shapeRefs.current[rect.id] = node; else delete shapeRefs.current[rect.id]; }}
                             onClick={e => { if (!isPanning) handleClick(rect.id, e); }}
-                            onDragStart={e => handleDragStart(rect.id, e)}
-                            onDragMove={e => handleDragMove(rect.id, e)}
-                            onDragEnd={() => handleDragEnd(rect.id)}
+                            onDragStart={() => handleDragStart(rect.id)}
+                            onDragMove={(e) => handleDragMove(rect.id, e)}
+                            onDragEnd={() => handleDragEnd()}
                             onTransformEnd={handleTransformEnd}
                         />
                     ))}
@@ -869,9 +882,9 @@ const Whiteboard = () => {
                             isPanning={isPanning}
                             shapeRef={node => { if (node) shapeRefs.current[textItem.id] = node; else delete shapeRefs.current[textItem.id]; }}
                             onClick={e => { if (!isPanning) handleClick(textItem.id, e); }}
-                            onDragStart={e => handleDragStart(textItem.id, e)}
-                            onDragMove={e => handleDragMove(textItem.id, e)}
-                            onDragEnd={() => handleDragEnd(textItem.id)}
+                            onDragStart={() => handleDragStart(textItem.id)}
+                            onDragMove={(e) => handleDragMove(textItem.id, e)}
+                            onDragEnd={() => handleDragEnd()}
                             onTransformEnd={handleTransformEnd}
                         />
                     ))}
@@ -885,9 +898,9 @@ const Whiteboard = () => {
                             isPanning={isPanning}
                             shapeRef={node => { if (node) shapeRefs.current[line.id] = node; else delete shapeRefs.current[line.id]; }}
                             onClick={e => { if (mode === 'select' && !isPanning) handleClick(line.id, e); }}
-                            onDragStart={e => handleDragStart(line.id, e)}
-                            onDragMove={e => handleDragMove(line.id, e)}
-                            onDragEnd={() => handleDragEnd(line.id)}
+                            onDragStart={() => handleDragStart(line.id)}
+                            onDragMove={(e) => handleDragMove(line.id, e)}
+                            onDragEnd={() => handleDragEnd()}
                         />
                     ))}
 
@@ -911,9 +924,9 @@ const Whiteboard = () => {
                             isPanning={isPanning}
                             shapeRef={node => { if (node) shapeRefs.current[circle.id] = node; else delete shapeRefs.current[circle.id]; }}
                             onClick={e => { if (!isPanning) handleClick(circle.id, e); }}
-                            onDragStart={e => handleDragStart(circle.id, e)}
-                            onDragMove={e => handleDragMove(circle.id, e)}
-                            onDragEnd={() => handleDragEnd(circle.id)}
+                            onDragStart={() => handleDragStart(circle.id)}
+                            onDragMove={(e) => handleDragMove(circle.id, e)}
+                            onDragEnd={() => handleDragEnd()}
                             onTransformEnd={handleTransformEnd}
                         />
                     ))}
@@ -927,9 +940,9 @@ const Whiteboard = () => {
                             isPanning={isPanning}
                             shapeRef={node => { if (node) shapeRefs.current[image.id] = node; else delete shapeRefs.current[image.id]; }}
                             onClick={e => { if (!isPanning) handleClick(image.id, e); }}
-                            onDragStart={e => handleDragStart(image.id, e)}
-                            onDragMove={e => handleDragMove(image.id, e)}
-                            onDragEnd={() => handleDragEnd(image.id)}
+                            onDragStart={() => handleDragStart(image.id)}
+                            onDragMove={(e) => handleDragMove(image.id, e)}
+                            onDragEnd={() => handleDragEnd()}
                             onTransformEnd={handleTransformEnd}
                         />
                     ))}
@@ -944,11 +957,11 @@ const Whiteboard = () => {
                             isPanning={isPanning}
                             shapeRef={node => { if (node) shapeRefs.current[term.id] = node; else delete shapeRefs.current[term.id]; }}
                             onClick={e => { if (!isPanning) handleClick(term.id, e); }}
-                            onDragStart={e => handleDragStart(term.id, e)}
-                            onDragMove={e => handleDragMove(term.id, e)}
-                            onDragEnd={() => handleDragEnd(term.id)}
+                            onDragStart={() => handleDragStart(term.id)}
+                            onDragMove={(e) => handleDragMove(term.id, e)}
+                            onDragEnd={() => handleDragEnd()}
                             onClose={() => removeTerminal(term.id)}
-                            onToggleSelect={() => handleClick(term.id, { evt: { shiftKey: true } } as any)}
+                            onToggleSelect={() => handleClick(term.id, { evt: { shiftKey: true } } as unknown as KonvaEventObject<MouseEvent>)}
                         />
                     ))}
 

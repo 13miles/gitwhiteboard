@@ -1,5 +1,5 @@
 'use client';
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { Group, Rect, Text } from 'react-konva';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -25,6 +25,16 @@ const TextShape = ({
 }: TextShapeProps) => {
     // 선택 테두리 크기 측정용 내부 ref
     const textNodeRef = useRef<Konva.Text>(null);
+    const [textSize, setTextSize] = useState({ width: 0, height: 0 });
+
+    useEffect(() => {
+        if (textNodeRef.current) {
+            setTextSize({
+                width: textNodeRef.current.width(),
+                height: textNodeRef.current.height(),
+            });
+        }
+    }, [textItem.text, textItem.fontSize]);
 
     return (
         <Group
@@ -42,8 +52,8 @@ const TextShape = ({
                 <>
                     {isSelected && (
                         <Rect
-                            width={textNodeRef.current?.width() || 0}
-                            height={textNodeRef.current?.height() || 0}
+                            width={textSize.width || 0}
+                            height={textSize.height || 0}
                             stroke="#3b82f6"
                             strokeWidth={1}
                             dash={[5, 5]}

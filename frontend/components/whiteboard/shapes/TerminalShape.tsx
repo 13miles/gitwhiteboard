@@ -31,6 +31,12 @@ const TerminalShape: React.FC<TerminalShapeProps> = ({ terminal, isSelected, onT
     const wsRef = useRef<WebSocket | null>(null);
     const [isLoaded, setIsLoaded] = useState(false);
 
+    // Keep the latest onClose callback without triggering effects
+    const onCloseRef = useRef(onClose);
+    useEffect(() => {
+        onCloseRef.current = onClose;
+    }, [onClose]);
+
     // ref callback: div가 DOM에 mount/unmount 될 때마다 호출됨
     const refCallback = useCallback((node: HTMLDivElement | null) => {
         setTerminalEl(node);
@@ -94,8 +100,8 @@ const TerminalShape: React.FC<TerminalShapeProps> = ({ terminal, isSelected, onT
 
         ws.onclose = () => {
             // Auto-close terminal if session ends
-            if (onClose) {
-                onClose();
+            if (onCloseRef.current) {
+                onCloseRef.current();
             } else {
                 term.write('\r\n\x1b[31mConnection closed.\x1b[0m\r\n');
             }
@@ -111,12 +117,18 @@ const TerminalShape: React.FC<TerminalShapeProps> = ({ terminal, isSelected, onT
             }
         });
 
+        let lastEscPressTime = 0;
         term.attachCustomKeyEventHandler((e) => {
-            // Escape 키 누르면 터미널 포커스 해제 (이후 단축키 동작 가능)
+            // Escape 키 두 번 연속 누르면 터미널 포커스 해제 (이후 단축키 동작 가능)
             if (e.key === 'Escape' && e.type === 'keydown') {
-                term.blur();
-                document.body.focus();
-                return false;
+                const now = Date.now();
+                if (now - lastEscPressTime < 400) {
+                    term.blur();
+                    document.body.focus();
+                    lastEscPressTime = 0; // reset
+                    return false;
+                }
+                lastEscPressTime = now;
             }
             return true;
         });
@@ -149,7 +161,7 @@ const TerminalShape: React.FC<TerminalShapeProps> = ({ terminal, isSelected, onT
             term.dispose();
             xtermRef.current = null;
         };
-    }, [terminalEl, onClose, terminal.fontSize]);
+    }, [terminalEl, terminal.fontSize]);
 
     // 선택 시 xterm 포커스
     // useEffect(() => {
@@ -175,7 +187,7 @@ const TerminalShape: React.FC<TerminalShapeProps> = ({ terminal, isSelected, onT
         }
     }, [terminal.width, terminal.height, isLoaded]);
 
-    // Update xterm options when font size changes
+    // Configure font size dynamically without remounting WS
     useEffect(() => {
         if (isLoaded && xtermRef.current && terminal.fontSize) {
             xtermRef.current.options.fontSize = terminal.fontSize;

@@ -161,7 +161,8 @@ const TerminalShape: React.FC<TerminalShapeProps> = ({ terminal, isSelected, onT
             term.dispose();
             xtermRef.current = null;
         };
-    }, [terminalEl, terminal.fontSize]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [terminalEl]);
 
     // 선택 시 xterm 포커스
     // useEffect(() => {

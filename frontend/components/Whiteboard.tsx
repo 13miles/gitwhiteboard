@@ -343,7 +343,7 @@ const Whiteboard = () => {
                 setTerminals(prev => [...prev, {
                     id: newId,
                     x: x || 100, y: y || 100,
-                    width: 580, height: 360,
+                    width: 1508, height: 414,
                 }]);
                 // 생성 즉시 선택 → pointerEvents 활성화
                 setSelectedIds(new Set([newId]));
@@ -655,6 +655,8 @@ const Whiteboard = () => {
             return;
         }
 
+        if (mode !== 'select') return;
+
         const metaPressed = e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey;
         if (!metaPressed) {
             if (!selectedIds.has(id)) setSelectedIds(new Set([id]));
@@ -759,6 +761,18 @@ const Whiteboard = () => {
 
         setSelectedIds(newSelected);
         setSelection(null);
+    };
+
+    const removeTerminal = (id: string) => {
+        setTerminals(prev => prev.filter(t => t.id !== id));
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+        });
+        if (shapeRefs.current[id]) {
+            delete shapeRefs.current[id];
+        }
     };
 
     // ── Early return while loading ─────────
@@ -929,6 +943,8 @@ const Whiteboard = () => {
                             mode={mode}
                             shapeRef={node => { if (node) shapeRefs.current[term.id] = node; else delete shapeRefs.current[term.id]; }}
                             onClick={e => { if (!isPanning) handleClick(term.id, e); }}
+                            onClose={() => removeTerminal(term.id)}
+                            onToggleSelect={() => handleClick(term.id, { evt: { shiftKey: true } } as any)}
                         />
                     ))}
 

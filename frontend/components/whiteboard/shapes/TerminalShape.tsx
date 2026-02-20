@@ -15,9 +15,11 @@ interface TerminalShapeProps {
     mode: string;
     shapeRef?: (node: Konva.Group | null) => void;
     onClick?: (e: KonvaEventObject<MouseEvent>) => void;
+    onClose?: () => void;
+    onToggleSelect?: () => void;
 }
 
-const TerminalShape: React.FC<TerminalShapeProps> = ({ terminal, isSelected, onTransformEnd, mode, shapeRef, onClick }) => {
+const TerminalShape: React.FC<TerminalShapeProps> = ({ terminal, isSelected, onTransformEnd, mode, shapeRef, onClick, onClose, onToggleSelect }) => {
     // div가 실제로 DOM에 붙었을 때 state로 추적
     const [terminalEl, setTerminalEl] = useState<HTMLDivElement | null>(null);
     const xtermRef = useRef<Terminal | null>(null);
@@ -43,20 +45,19 @@ const TerminalShape: React.FC<TerminalShapeProps> = ({ terminal, isSelected, onT
                 background: '#1e1e1e',
             },
             fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-            fontSize: 14,
+            fontSize: 22,
+            scrollback: 5000,
         });
 
         const fitAddon = new FitAddon();
         term.loadAddon(fitAddon);
 
         term.open(terminalEl);
-        console.log('[TerminalShape] xterm opened');
 
         // open 직후 바로 fit하면 싸이즈가 0일 수 있으므로 requestAnimationFrame 이후에 fit
         requestAnimationFrame(() => {
             try {
                 fitAddon.fit();
-                console.log('[TerminalShape] fitAddon.fit() called');
             } catch (e) {
                 console.error('[TerminalShape] fitAddon.fit() failed:', e);
             }
@@ -88,11 +89,15 @@ const TerminalShape: React.FC<TerminalShapeProps> = ({ terminal, isSelected, onT
         };
 
         ws.onclose = () => {
-            term.write('\r\n\x1b[31mConnection closed.\x1b[0m\r\n');
+            // Auto-close terminal if session ends
+            if (onClose) {
+                onClose();
+            } else {
+                term.write('\r\n\x1b[31mConnection closed.\x1b[0m\r\n');
+            }
         };
 
         ws.onerror = (err) => {
-            console.error('[TerminalShape] WebSocket onerror:', err);
             term.write('\r\n\x1b[31mWebSocket error. Is backend running?\x1b[0m\r\n');
         };
 
@@ -193,6 +198,14 @@ const TerminalShape: React.FC<TerminalShapeProps> = ({ terminal, isSelected, onT
                         width: '100%',
                         height: '100%',
                         background: '#1e1e1e',
+                    }}
+                    onClickCapture={(e) => {
+                        // 만약 Shift/Ctrl 키를 누른 상태에서 클릭하면 선택 토글 로직 실행
+                        if (isSelected && (e.shiftKey || e.ctrlKey || e.metaKey)) {
+                            if (onToggleSelect) {
+                                onToggleSelect();
+                            }
+                        }
                     }}
                 />
             </Html>

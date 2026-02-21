@@ -204,6 +204,18 @@ const Whiteboard = () => {
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            // 사용자가 입력 필드나 터미널에서 타이핑 중인 경우 단축키 무시
+            const target = e.target as HTMLElement;
+            if (
+                target.tagName === 'INPUT' ||
+                target.tagName === 'TEXTAREA' ||
+                target.isContentEditable ||
+                target.closest('.xterm-helper-textarea') || // xterm.js 전용 가드
+                target.closest('.xterm-screen')
+            ) {
+                return;
+            }
+
             console.log('KeyDown:', e.key, 'Code:', e.code, 'Shift:', e.shiftKey, 'Mode:', keyboardStateRef.current.mode);
             const s = keyboardStateRef.current;
 

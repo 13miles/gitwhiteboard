@@ -2,7 +2,7 @@
 
 # Start SSH service
 echo "Starting SSH service..."
-service ssh start
+sudo service ssh start
 
 # Start the FastAPI backend in the background
 echo "Starting FastAPI backend on port 8000..."

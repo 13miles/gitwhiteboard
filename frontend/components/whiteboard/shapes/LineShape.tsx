@@ -10,6 +10,8 @@ interface LineShapeProps {
     isSelected: boolean;
     mode: WhiteboardMode;
     isPanning: boolean;
+    themeColor: string;
+    theme: 'light' | 'dark';
     shapeRef: (node: Konva.Line | null) => void;
     onClick: (e: KonvaEventObject<MouseEvent>) => void;
     onDragStart: (e: KonvaEventObject<DragEvent>) => void;
@@ -19,14 +21,24 @@ interface LineShapeProps {
 
 const LineShape = ({
     line, isSelected, mode, isPanning,
+    themeColor, theme,
     shapeRef, onClick, onDragStart, onDragMove, onDragEnd,
 }: LineShapeProps) => {
+    // Helper to determine if a color should be treated as the theme's foreground
+    const isThemeForeground = (color: string | undefined) => {
+        if (!color) return true;
+        const c = color.toLowerCase();
+        return c === 'black' || c === '#171717' || c === '#000000' || c === '#000';
+    };
+
+    const strokeColor = isSelected ? '#eab308' : (isThemeForeground(line.stroke) ? themeColor : line.stroke);
+
     const commonProps = {
         ref: shapeRef,
         x: line.x,
         y: line.y,
         points: line.points,
-        stroke: isSelected ? '#eab308' : line.stroke,
+        stroke: strokeColor || themeColor,
         strokeWidth: isSelected ? 4 : line.strokeWidth,
         hitStrokeWidth: LINE_HIT_STROKE_WIDTH,
         tension: 0,
@@ -43,7 +55,7 @@ const LineShape = ({
                 {...commonProps}
                 pointerLength={ARROW_POINTER_LENGTH}
                 pointerWidth={ARROW_POINTER_WIDTH}
-                fill={isSelected ? '#eab308' : (line.stroke || 'black')}
+                fill={strokeColor || themeColor}
             />
         );
     }

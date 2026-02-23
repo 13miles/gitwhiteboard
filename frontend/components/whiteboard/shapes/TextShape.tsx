@@ -11,6 +11,8 @@ interface TextShapeProps {
     isEditing: boolean;
     mode: WhiteboardMode;
     isPanning: boolean;
+    themeColor: string;
+    theme: 'light' | 'dark';
     shapeRef: (node: Konva.Group | null) => void;
     onClick: (e: KonvaEventObject<MouseEvent>) => void;
     onDragStart: (e: KonvaEventObject<DragEvent>) => void;
@@ -21,6 +23,7 @@ interface TextShapeProps {
 
 const TextShape = ({
     textItem, isSelected, isEditing, mode, isPanning,
+    themeColor, theme,
     shapeRef, onClick, onDragStart, onDragMove, onDragEnd, onTransformEnd,
 }: TextShapeProps) => {
     // 선택 테두리 크기 측정용 내부 ref
@@ -35,6 +38,15 @@ const TextShape = ({
             });
         }
     }, [textItem.text, textItem.fontSize]);
+
+    // Helper to determine if a color should be treated as the theme's foreground
+    const isThemeForeground = (color: string | undefined) => {
+        if (!color) return true;
+        const c = color.toLowerCase();
+        return c === 'black' || c === '#171717' || c === '#000000' || c === '#000';
+    };
+
+    const textColor = isThemeForeground(textItem.fill) ? themeColor : textItem.fill;
 
     return (
         <Group
@@ -63,7 +75,7 @@ const TextShape = ({
                         ref={textNodeRef}
                         text={textItem.text || 'Type...'}
                         fontSize={textItem.fontSize}
-                        fill={textItem.fill}
+                        fill={textColor || themeColor}
                         align="left"
                         fontFamily="Consolas, monospace"
                     />

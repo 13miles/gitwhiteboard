@@ -1,5 +1,6 @@
 'use client';
 import { RefObject } from 'react';
+import ThemeToggle from '@/components/ThemeToggle';
 
 interface SessionToolbarProps {
     onSave: () => void;
@@ -9,7 +10,8 @@ interface SessionToolbarProps {
 }
 
 const SessionToolbar = ({ onSave, onLoad, onClear, fileInputRef }: SessionToolbarProps) => (
-    <div className="absolute top-4 left-4 flex gap-2 z-10">
+    <div className="absolute top-4 left-4 flex items-center gap-2 z-10">
+        <ThemeToggle />
         <button
             onClick={onSave}
             className="text-white px-3 py-1 rounded shadow text-sm font-medium transition-colors hover:opacity-90"

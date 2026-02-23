@@ -39,6 +39,24 @@ const getRandomHex2 = () => {
 
 // ─────────────────────────────────────────
 const Whiteboard = () => {
+    // ── Theme state ──────────────────────
+    const [theme, setTheme] = useState<'light' | 'dark'>('light');
+
+    useEffect(() => {
+        const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
+        if (savedTheme) setTheme(savedTheme);
+        else if (window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
+
+        const handleThemeChange = (e: any) => {
+            setTheme(e.detail.theme);
+        };
+        window.addEventListener('theme-change' as any, handleThemeChange);
+        return () => window.removeEventListener('theme-change' as any, handleThemeChange);
+    }, []);
+
+    const themeColor = theme === 'dark' ? '#ededed' : '#171717'; // foreground
+    const themeBg = theme === 'dark' ? '#0a0a0a' : '#ffffff'; // background
+
     // ── Shape state ──────────────────────
     const [circles, setCircles] = useState<CircleData[]>([]);
     const [lines, setLines] = useState<LineData[]>([]);
@@ -268,12 +286,12 @@ const Whiteboard = () => {
             // Color shortcuts (1-6)
             if (['1', '2', '3', '4', '5', '6'].includes(e.key) && s.selectedIds.size > 0) {
                 const colorMap: Record<string, { stroke: string; fill?: string; textFill?: string }> = {
-                    '1': { stroke: 'black', fill: 'transparent', textFill: 'black' },
+                    '1': { stroke: themeColor, fill: 'transparent', textFill: themeColor },
                     '2': { stroke: '#ef4444', fill: '#ef4444', textFill: 'white' }, // Red-500 (Clear)
                     '3': { stroke: '#155dfc', fill: '#155dfc', textFill: 'white' }, // Custom Blue
                     '4': { stroke: '#22c55e', fill: '#22c55e', textFill: 'white' }, // Green-500 (Load)
                     '5': { stroke: 'gray', fill: 'gray', textFill: 'white' },
-                    '6': { stroke: 'white', fill: 'transparent', textFill: 'black' },
+                    '6': { stroke: theme === 'dark' ? '#171717' : 'white', fill: 'transparent', textFill: themeColor },
                 };
 
                 const style = colorMap[e.key];
@@ -289,7 +307,7 @@ const Whiteboard = () => {
             // Text only Color shortcuts (7-0)
             if (['7', '8', '9', '0'].includes(e.key) && s.selectedIds.size > 0) {
                 const textColorMap: Record<string, string> = {
-                    '7': 'black',
+                    '7': themeColor,
                     '8': '#ef4444', // Red
                     '9': '#155dfc', // Blue
                     '0': '#22c55e', // Green
@@ -410,7 +428,7 @@ const Whiteboard = () => {
                             x: x || 100, y: y || 100,
                             radius: DEFAULT_CIRCLE_RADIUS,
                             text: getRandomHex2(),
-                            stroke: 'black',
+                            stroke: themeColor,
                         }]);
                     }
                 }
@@ -438,7 +456,7 @@ const Whiteboard = () => {
                             x: (x || 100) - DEFAULT_RECT_SIZE_SM / 2,
                             y: (y || 100) - DEFAULT_RECT_SIZE_SM / 2,
                             width: DEFAULT_RECT_SIZE_SM, height: DEFAULT_RECT_SIZE_SM,
-                            text: '', stroke: 'black',
+                            text: '', stroke: themeColor,
                         }]);
                     }
                 }
@@ -670,7 +688,7 @@ const Whiteboard = () => {
                     setLines(prev => [...prev, {
                         id: `line-${nanoid()}`, x: 0, y: 0,
                         points: [startX, startY, endX, endY],
-                        stroke: 'black', strokeWidth: DEFAULT_STROKE_WIDTH,
+                        stroke: themeColor, strokeWidth: DEFAULT_STROKE_WIDTH,
                         type: mode as 'line' | 'arrow',
                     }]);
                 }
@@ -702,7 +720,7 @@ const Whiteboard = () => {
             const { x, y } = getRelativePointerPosition();
             saveHistory();
             const newTextId = `text-${nanoid()}`;
-            setTexts(prev => [...prev, { id: newTextId, x, y, text: '', fontSize: DEFAULT_TEXT_FONT_SIZE, fill: 'black' }]);
+            setTexts(prev => [...prev, { id: newTextId, x, y, text: '', fontSize: DEFAULT_TEXT_FONT_SIZE, fill: themeColor }]);
             const stage = stageRef.current;
             const scale = stage?.scaleX() ?? 1;
             const pos = stage?.absolutePosition() ?? { x: 0, y: 0 };
@@ -754,7 +772,7 @@ const Whiteboard = () => {
             setLines(prev => [...prev, {
                 id: `line-${nanoid()}`, x: 0, y: 0,
                 points: [drawingLine.startX, drawingLine.startY, drawingLine.endX, drawingLine.endY],
-                stroke: 'black', strokeWidth: DEFAULT_STROKE_WIDTH,
+                stroke: themeColor, strokeWidth: DEFAULT_STROKE_WIDTH,
                 type: mode as 'line' | 'arrow',
             }]);
             setDrawingLine(null);
@@ -844,11 +862,11 @@ const Whiteboard = () => {
                         minWidth: (isEditingRect || isEditingCircle) ? undefined : '200px',
                         fontSize: (isEditingRect || isEditingCircle) ? 18 : (currentEditingText?.fontSize || 20),
                         textAlign: (isEditingRect || isEditingCircle) ? 'center' : 'left',
-                        border: '1px solid #3b82f6', outline: 'none', background: 'transparent',
+                        border: '1px solid #3b82f6', outline: 'none', background: themeBg,
                         resize: 'none', overflow: 'hidden', zIndex: 20, padding: 0,
                         paddingTop: (isEditingRect || isEditingCircle) ? Math.max(0, (editPos.h - (editingValue?.split('\n').length || 1) * 22) / 2) : 0,
                         lineHeight: '22px', fontFamily: 'Consolas, monospace',
-                        color: (isEditingRect || isEditingCircle) ? 'black' : (currentEditingText?.fill || 'black'),
+                        color: (isEditingRect || isEditingCircle) ? themeColor : (currentEditingText?.fill || themeColor),
                     }}
                 />
             )}
@@ -858,7 +876,7 @@ const Whiteboard = () => {
                 height={size.height}
                 ref={stageRef}
                 draggable={isPanning}
-                className={`bg-white touch-none ${isPanning ? 'cursor-grab active:cursor-grabbing' : (mode === 'text' ? 'cursor-text' : mode !== 'select' ? 'cursor-crosshair' : 'cursor-default')}`}
+                className={`bg-background transition-colors duration-300 touch-none ${isPanning ? 'cursor-grab active:cursor-grabbing' : (mode === 'text' ? 'cursor-text' : mode !== 'select' ? 'cursor-crosshair' : 'cursor-default')}`}
                 onMouseDown={onMouseDown}
                 onMouseMove={onMouseMove}
                 onMouseUp={onMouseUp}
@@ -875,6 +893,8 @@ const Whiteboard = () => {
                             isEditing={editingId === rect.id}
                             mode={mode}
                             isPanning={isPanning}
+                            themeColor={themeColor}
+                            theme={theme}
                             shapeRef={node => { if (node) shapeRefs.current[rect.id] = node; else delete shapeRefs.current[rect.id]; }}
                             onClick={e => { if (!isPanning) handleClick(rect.id, e); }}
                             onDragStart={() => handleDragStart(rect.id)}
@@ -892,6 +912,8 @@ const Whiteboard = () => {
                             isEditing={editingId === textItem.id}
                             mode={mode}
                             isPanning={isPanning}
+                            themeColor={themeColor}
+                            theme={theme}
                             shapeRef={node => { if (node) shapeRefs.current[textItem.id] = node; else delete shapeRefs.current[textItem.id]; }}
                             onClick={e => { if (!isPanning) handleClick(textItem.id, e); }}
                             onDragStart={() => handleDragStart(textItem.id)}
@@ -908,6 +930,8 @@ const Whiteboard = () => {
                             isSelected={selectedIds.has(line.id)}
                             mode={mode}
                             isPanning={isPanning}
+                            themeColor={themeColor}
+                            theme={theme}
                             shapeRef={node => { if (node) shapeRefs.current[line.id] = node; else delete shapeRefs.current[line.id]; }}
                             onClick={e => { if (mode === 'select' && !isPanning) handleClick(line.id, e); }}
                             onDragStart={() => handleDragStart(line.id)}
@@ -919,11 +943,11 @@ const Whiteboard = () => {
                     {/* Drawing preview */}
                     {drawingLine && (mode === 'arrow' ? (
                         <Arrow points={[drawingLine.startX, drawingLine.startY, drawingLine.endX, drawingLine.endY]}
-                            stroke="black" strokeWidth={DEFAULT_STROKE_WIDTH}
-                            pointerLength={ARROW_POINTER_LENGTH} pointerWidth={ARROW_POINTER_WIDTH} fill="black" />
+                            stroke={themeColor} strokeWidth={DEFAULT_STROKE_WIDTH}
+                            pointerLength={ARROW_POINTER_LENGTH} pointerWidth={ARROW_POINTER_WIDTH} fill={themeColor} />
                     ) : (
                         <KonvaLine points={[drawingLine.startX, drawingLine.startY, drawingLine.endX, drawingLine.endY]}
-                            stroke="black" strokeWidth={DEFAULT_STROKE_WIDTH} />
+                            stroke={themeColor} strokeWidth={DEFAULT_STROKE_WIDTH} />
                     ))}
 
                     {circles.map(circle => (
@@ -934,6 +958,8 @@ const Whiteboard = () => {
                             isConnectStart={circle.id === tempLineStartId}
                             mode={mode}
                             isPanning={isPanning}
+                            themeColor={themeColor}
+                            theme={theme}
                             shapeRef={node => { if (node) shapeRefs.current[circle.id] = node; else delete shapeRefs.current[circle.id]; }}
                             onClick={e => { if (!isPanning) handleClick(circle.id, e); }}
                             onDragStart={() => handleDragStart(circle.id)}

@@ -24,9 +24,9 @@ const ModeIndicator = ({ mode, isPanning, tempLineStartId }: ModeIndicatorProps)
     }
 
     return (
-        <div className="absolute bottom-4 right-4 bg-white px-3 py-1.5 rounded shadow border z-10 select-none pointer-events-none flex flex-col items-center whitespace-nowrap">
+        <div className="absolute bottom-4 right-4 bg-background px-3 py-1.5 rounded shadow border border-gray-200 dark:border-gray-800 z-10 select-none pointer-events-none flex flex-col items-center whitespace-nowrap">
             <div className="text-xs text-gray-500">
-                Current Mode: <span className="font-bold text-black">{modeText}</span>
+                Current Mode: <span className="font-bold text-foreground">{modeText}</span>
             </div>
             <div className="text-[10px] text-gray-400">
                 {isPanning ? '🖐 Panning...' : modeHint}

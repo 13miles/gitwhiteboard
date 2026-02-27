@@ -11,7 +11,6 @@ interface LineShapeProps {
     mode: WhiteboardMode;
     isPanning: boolean;
     themeColor: string;
-    theme: 'light' | 'dark';
     shapeRef: (node: Konva.Line | null) => void;
     onClick: (e: KonvaEventObject<MouseEvent>) => void;
     onDragStart: (e: KonvaEventObject<DragEvent>) => void;
@@ -21,7 +20,7 @@ interface LineShapeProps {
 
 const LineShape = ({
     line, isSelected, mode, isPanning,
-    themeColor, theme,
+    themeColor,
     shapeRef, onClick, onDragStart, onDragMove, onDragEnd,
 }: LineShapeProps) => {
     // Helper to determine if a color should be treated as the theme's foreground

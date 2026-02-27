@@ -12,7 +12,6 @@ interface TextShapeProps {
     mode: WhiteboardMode;
     isPanning: boolean;
     themeColor: string;
-    theme: 'light' | 'dark';
     shapeRef: (node: Konva.Group | null) => void;
     onClick: (e: KonvaEventObject<MouseEvent>) => void;
     onDragStart: (e: KonvaEventObject<DragEvent>) => void;
@@ -23,7 +22,7 @@ interface TextShapeProps {
 
 const TextShape = ({
     textItem, isSelected, isEditing, mode, isPanning,
-    themeColor, theme,
+    themeColor,
     shapeRef, onClick, onDragStart, onDragMove, onDragEnd, onTransformEnd,
 }: TextShapeProps) => {
     // 선택 테두리 크기 측정용 내부 ref

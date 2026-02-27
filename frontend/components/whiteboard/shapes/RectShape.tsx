@@ -41,7 +41,12 @@ const RectShape = ({
     };
 
     const strokeColor = isSelected ? '#eab308' : (isThemeForeground(rect.stroke) ? themeColor : (isThemeBackground(rect.stroke) && theme === 'dark' ? '#171717' : rect.stroke));
-    const textColor = isThemeForeground(rect.textFill) ? themeColor : (isThemeBackground(rect.textFill) && theme === 'dark' ? '#171717' : rect.textFill);
+    const hasFill = rect.fill && rect.fill !== 'transparent';
+    const textColor = theme === 'dark'
+        ? (isThemeForeground(rect.textFill) || isThemeBackground(rect.textFill) ? 'white' : rect.textFill)
+        : (hasFill && (isThemeForeground(rect.textFill) || isThemeBackground(rect.textFill))
+            ? 'white'
+            : (isThemeForeground(rect.textFill) ? themeColor : rect.textFill));
 
     return (
         <Group

@@ -40,18 +40,22 @@ const getRandomHex2 = () => {
 // ─────────────────────────────────────────
 const Whiteboard = () => {
     // ── Theme state ──────────────────────
-    const [theme, setTheme] = useState<'light' | 'dark'>('light');
+    const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+        if (typeof window !== 'undefined') {
+            const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
+            if (savedTheme) return savedTheme;
+            return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        return 'light';
+    });
 
     useEffect(() => {
-        const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
-        if (savedTheme) setTheme(savedTheme);
-        else if (window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
-
-        const handleThemeChange = (e: any) => {
-            setTheme(e.detail.theme);
+        const handleThemeChange = (e: Event) => {
+            const customEvent = e as CustomEvent<{ theme: 'light' | 'dark' }>;
+            setTheme(customEvent.detail.theme);
         };
-        window.addEventListener('theme-change' as any, handleThemeChange);
-        return () => window.removeEventListener('theme-change' as any, handleThemeChange);
+        window.addEventListener('theme-change', handleThemeChange);
+        return () => window.removeEventListener('theme-change', handleThemeChange);
     }, []);
 
     const themeColor = theme === 'dark' ? '#ededed' : '#171717'; // foreground
@@ -559,6 +563,7 @@ const Whiteboard = () => {
             document.removeEventListener('keydown', handleKeyDown);
             document.removeEventListener('keyup', handleKeyUp);
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [handleUndo, saveHistory]); // stateRef로 접근하므로 최소 의존성
 
     // ── Helpers ───────────────────────────
@@ -913,7 +918,6 @@ const Whiteboard = () => {
                             mode={mode}
                             isPanning={isPanning}
                             themeColor={themeColor}
-                            theme={theme}
                             shapeRef={node => { if (node) shapeRefs.current[textItem.id] = node; else delete shapeRefs.current[textItem.id]; }}
                             onClick={e => { if (!isPanning) handleClick(textItem.id, e); }}
                             onDragStart={() => handleDragStart(textItem.id)}
@@ -931,7 +935,6 @@ const Whiteboard = () => {
                             mode={mode}
                             isPanning={isPanning}
                             themeColor={themeColor}
-                            theme={theme}
                             shapeRef={node => { if (node) shapeRefs.current[line.id] = node; else delete shapeRefs.current[line.id]; }}
                             onClick={e => { if (mode === 'select' && !isPanning) handleClick(line.id, e); }}
                             onDragStart={() => handleDragStart(line.id)}

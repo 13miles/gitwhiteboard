@@ -41,7 +41,12 @@ const CircleShape = ({
     };
 
     const strokeColor = isSelected || isConnectStart ? '#eab308' : (isThemeForeground(circle.stroke) ? themeColor : (isThemeBackground(circle.stroke) && theme === 'dark' ? '#171717' : circle.stroke));
-    const textColor = isThemeForeground(circle.textFill) ? themeColor : (isThemeBackground(circle.textFill) && theme === 'dark' ? '#171717' : circle.textFill);
+    const hasFill = circle.fill && circle.fill !== 'transparent';
+    const textColor = theme === 'dark'
+        ? (isThemeForeground(circle.textFill) || isThemeBackground(circle.textFill) ? 'white' : circle.textFill)
+        : (hasFill && (isThemeForeground(circle.textFill) || isThemeBackground(circle.textFill))
+            ? 'white'
+            : (isThemeForeground(circle.textFill) ? themeColor : circle.textFill));
 
     return (
         <Group

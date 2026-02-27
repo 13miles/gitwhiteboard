@@ -13,6 +13,9 @@ const nextConfig: NextConfig = {
   /* config options here */
   output: 'standalone',
   reactCompiler: false,
+  turbopack: {
+    root: process.cwd(),
+  },
   env: {
     NEXT_PUBLIC_COMMIT_HASH: commitHash,
   },
